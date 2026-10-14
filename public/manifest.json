@@ -1,0 +1,16 @@
+{
+  "name": "lolPing · Signal Wheel for Owlbear Rodeo",
+  "version": "1.0.3",
+  "manifest_version": 1,
+  "description": "Eight-direction League-style map signals for Owlbear Rodeo.",
+  "author": "yyzz97",
+  "homepage_url": "https://github.com/yyzz97/lolping-owlbear",
+  "icon": "/wheel.svg",
+  "background_url": "/index.html",
+  "permissions": [
+    {
+      "name": "autoplay",
+      "reason": "Play brief local sound cues when a signal is sent or received."
+    }
+  ]
+}

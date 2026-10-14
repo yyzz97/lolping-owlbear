@@ -1,7 +1,40 @@
-# lolPing for Owlbear Rodeo 2
+# lolPing Signal Wheel for Owlbear Rodeo 2
 
-Install this extension in Owlbear Rodeo using the manifest URL:
+This is a standalone Owlbear Rodeo 2 extension built with `@owlbear-rodeo/sdk`. It registers an Owlbear toolbar tool with `OBR.tool.create` and `OBR.tool.createMode`, then sends room pings through Owlbear's broadcast API. It is not a Foundry VTT module or a Foundry adapter.
 
-`https://yyzz97.github.io/lolping-owlbear/manifest.json`
+## Use
 
-This repository hosts the built static extension. Source and local setup notes: https://github.com/DMHPJ/fvtt-lolping/tree/codex/fvtt13-base/owlbear
+1. In Owlbear Rodeo, add this production manifest URL: <https://yyzz97.github.io/lolping-owlbear/manifest.json>. For development, run `npm run dev` and add the local Vite URL's `/manifest.json`.
+2. In the room, open the Extensions menu and enable **lolPing · Signal Wheel for Owlbear Rodeo**.
+3. Select the extension's tool in the room toolbar.
+4. On the map, hold the left mouse button, drag toward a signal, then release to send it. Release near the wheel center or press **Esc** to cancel.
+5. Everyone in the same room with the extension enabled sees the same scene-point ping, the sender name, and the signal name. Signals stack when they overlap and fade after three seconds.
+
+The wheel opens at the pointer's initial map position and stays centered there while you drag. It keeps a consistent screen size at different zoom levels. The signal is anchored to the point where the gesture began. Sound is generated locally with Web Audio; no sound CDN is used.
+
+## Develop
+
+Requires Node.js 20.19+ or 22.12+.
+
+```sh
+npm install
+npm run dev
+npm run check
+npm test
+npm run build
+```
+
+Use the Vite URL for local extension development. `npm run build` writes the Owlbear manifest, background page, and assets to `dist/`; the build step converts manifest resource paths to the hosted GitHub Pages URLs.
+
+## Two-client acceptance
+
+Install the same manifest in two clients in one room. Give the clients different map zoom and pan positions, then send each of the eight signals. Both clients should see each marker on the same scene point with the sender and signal name; a second signal can overlap it, and both disappear after three seconds. Release near the wheel center or press **Esc** to cancel. Switch scenes and verify old markers disappear and new signals do not cross into the other scene.
+
+The unit tests use a mock Owlbear API. They do not replace this live, two-client check.
+
+## Notes
+
+- Room messages are ephemeral and are not saved as permanent scene items.
+- Scene identity is stored in this extension's scene metadata so signals from one scene are ignored in another. If scene metadata cannot be written, the extension hashes the shared scene item IDs as a fallback.
+- The Owlbear implementation uses original vector artwork and generated tones; it does not redistribute Riot Games image or audio assets.
+- Inspired by the signal categories and radial interaction in [DMHPJ/fvtt-lolping](https://github.com/DMHPJ/fvtt-lolping).

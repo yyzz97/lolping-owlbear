@@ -1,0 +1,21 @@
+{
+  "name": "lolping-owlbear",
+  "version": "1.0.3",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "check": "node scripts/check.js",
+    "build": "vite build && node scripts/prepare-manifest.js",
+    "test": "node --test tests/*.test.js"
+  },
+  "dependencies": {
+    "@owlbear-rodeo/sdk": "3.1.0"
+  },
+  "devDependencies": {
+    "vite": "8.3.4"
+  },
+  "overrides": {
+    "uuid": "14.0.3"
+  }
+}
