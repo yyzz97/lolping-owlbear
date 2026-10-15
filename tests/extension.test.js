@@ -2,7 +2,6 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { registerExtension, CHANNEL, DISPLAY_MS, EXTENSION_ID } from '../src/extension.js';
 import { uiAssetsFor } from '../src/ui-assets.js';
-import { renderPingLabel } from '../src/render-ping.js';
 
 const TEST_WHEEL_ICON = 'https://static.example.test/wheel.svg';
 const TEST_UI_ASSETS = uiAssetsFor('https://static.example.test/');
@@ -24,6 +23,26 @@ function billboardBuilder() {
         };
       },
     });
+    return proxy;
+  };
+}
+
+function labelBuilder() {
+  return () => {
+    const item = { type: 'LABEL', text: { style: {} }, style: {} };
+    const textFields = ['plainText', 'width', 'height'];
+    const textStyles = ['padding', 'fontFamily', 'fontSize', 'fontWeight', 'textAlign', 'textAlignVertical', 'fillColor', 'strokeColor', 'strokeWidth', 'lineHeight'];
+    const labelStyles = ['backgroundOpacity', 'pointerDirection', 'pointerHeight', 'pointerWidth'];
+    const proxy = new Proxy({}, { get(_target, method) {
+      if (method === 'build') return () => structuredClone(item);
+      return value => {
+        if (textFields.includes(method)) item.text[method] = value;
+        else if (textStyles.includes(method)) item.text.style[method] = value;
+        else if (labelStyles.includes(method)) item.style[method] = value;
+        else item[method] = value;
+        return proxy;
+      };
+    } });
     return proxy;
   };
 }
@@ -89,7 +108,7 @@ function makeOwlbear(scale = 2, {
       local: {
         async addItems(values) {
           for (const item of values) {
-            if (item.image.url.length > 2048) throw new Error('image.url exceeds Owlbear limit');
+            if (item.image?.url.length > 2048) throw new Error('image.url exceeds Owlbear limit');
             items.set(item.id, structuredClone(item));
           }
         },
@@ -123,7 +142,7 @@ const event = (x, y) => ({ pointerPosition: { x, y } });
 const options = () => ({
   buildBillboard: billboardBuilder(), wheelIcon: TEST_WHEEL_ICON,
   signalAssets: TEST_SIGNAL_ASSETS, uiAssets: TEST_UI_ASSETS,
-  renderPingLabel, version: 'test',
+  buildLabel: labelBuilder(), version: 'test',
 });
 
 async function setup(t, scale = 2, settings = {}) {
@@ -194,11 +213,15 @@ test('dragging updates one wheel image and broadcasts the original scene point',
     { signalId: fake.messages[0].data.signalId, x: fake.messages[0].data.x, y: fake.messages[0].data.y },
     { signalId: 'omw', x: 120, y: 240 },
   );
-  assert.equal(fake.items.size, 2, 'wheel is removed and the PNG plus matching text frame remain');
+  assert.equal(fake.items.size, 2, 'wheel is removed and the hosted icon plus native label remain');
   const marker = [...fake.items.values()][0];
   assert.equal(marker.name, '正在路上 · Alice');
   assert.equal(marker.image.url, TEST_UI_ASSETS.pings.omw.url);
-  assert.match([...fake.items.values()][1].image.url, /^data:image\/svg\+xml;base64,/);
+  const label = [...fake.items.values()][1];
+  assert.equal(label.type, 'LABEL');
+  assert.equal(label.text.plainText, '正在路上 · Alice');
+  assert.equal(label.style.backgroundOpacity, 0);
+  assert.equal(label.image, undefined);
 });
 
 test('center release sends caution with its audio and Escape cancels', async t => {
@@ -346,7 +369,7 @@ test('a rejected label keeps the hosted icon visible and cleans it up on time', 
   t.mock.timers.enable({ apis: ['setTimeout'] });
   const addItems = fake.obr.scene.local.addItems;
   fake.obr.scene.local.addItems = async items => {
-    if (items.some(item => item.image.mime === 'image/svg+xml')) {
+    if (items.some(item => item.type === 'LABEL')) {
       const error = new Error('items do not match');
       error.details = [{ context: { message: '"items[0].image.url" must be a valid uri' } }];
       throw error;
@@ -383,7 +406,7 @@ function projectedSize(item, dpi, zoom) {
     height: item.image.height * item.scale.y * dpi / item.grid.dpi * zoom * viewScale };
 }
 
-test('one fixed screen frame preserves wheel and ping layout across extreme zoom and grid DPI', async t => {
+test('fixed billboards and native labels share scene anchors across zoom and grid DPI', async t => {
   for (const dpi of [96, 128, 150, 300]) {
     const fake = await setup(t, 1, { dpi });
     const mode = fake.modes.values().next().value;
@@ -400,11 +423,15 @@ test('one fixed screen frame preserves wheel and ping layout across extreme zoom
       assert.deepEqual(projectedSize(ping, dpi, zoom), { width: 200, height: 128 });
       assert.deepEqual(ping.position, { x: 900, y: 500 });
       assert.deepEqual(ping.grid.offset, { x: 200, y: 100 });
-      const label = [...fake.items.values()].find(item => item.image.mime === 'image/svg+xml');
+      const label = [...fake.items.values()].find(item => item.type === 'LABEL');
       assert.deepEqual(label.position, ping.position);
-      assert.deepEqual(label.grid, ping.grid);
-      assert.deepEqual(label.scale, ping.scale);
-      assert.deepEqual(label.style, ping.style);
+      assert.equal(label.text.width, 200);
+      assert.equal(label.text.height, 60);
+      assert.equal(label.style.pointerDirection, 'UP');
+      assert.equal(label.style.pointerHeight, 0);
+      assert.equal(label.style.backgroundOpacity, 0);
+      assert.equal(label.style.minViewScale, undefined);
+      assert.equal(label.style.maxViewScale, undefined);
       const release = event(400 + 120 / zoom, 300);
       mode.onToolMove({}, release);
       await flush();
@@ -416,4 +443,27 @@ test('one fixed screen frame preserves wheel and ping layout across extreme zoom
     await flush();
     assert.equal(fake.messages[0].data.signalId, 'caution');
   }
+});
+
+test('bursts of pointer events skip stale positions and release sends the latest direction', async t => {
+  const fake = await setup(t, 1);
+  const mode = fake.modes.values().next().value;
+  mode.onToolDown({}, event(300, 300));
+  await flush();
+  let reads = 0;
+  let releaseScale;
+  fake.obr.viewport.getScale = () => {
+    reads++;
+    return reads === 1 ? new Promise(resolve => { releaseScale = resolve; }) : Promise.resolve(1);
+  };
+  mode.onToolMove({}, event(450, 300));
+  await flush();
+  for (let index = 0; index < 500; index++) mode.onToolMove({}, event(150, 300));
+  mode.onToolUp({}, event(300, 150));
+  releaseScale(1);
+  await flush();
+  assert.ok(reads <= 2, `processed ${reads} scale reads for one pointer burst`);
+  assert.equal(fake.messages.length, 1);
+  assert.equal(fake.messages[0].data.signalId, 'retreat');
+  assert.ok([...fake.items.values()].every(item => !item.image || item.image.url.startsWith('https://')));
 });

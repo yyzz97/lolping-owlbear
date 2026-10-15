@@ -7,15 +7,15 @@
   #wheel { width: 344px; height: 344px; }
   #ping-frame { position: relative; width: 200px; height: 128px; }
   #ping-frame img { position: absolute; inset: 0; width: 200px; height: 128px; }
+  #ping-label { position: absolute; top: 45px; left: 0; width: 200px; text-align: center; font: 700 13px Roboto, sans-serif; color: #fff7e8; text-shadow: 0 1px 1px #111b20; }
 </style>
 <label>Signal <select id="signal"></select></label>
 <label>Player <input id="player" value="测试玩家 Alice"></label>
 <button id="render">Render</button> <output id="status"></output>
-<main><img id="wheel" alt="Wheel preview"><div id="ping-frame"><img id="ping" alt="Ping preview"><img id="ping-label" alt="Ping label preview"></div></main>
+<main><img id="wheel" alt="Wheel preview"><div id="ping-frame"><img id="ping" alt="Ping preview"><span id="ping-label"></span></div></main>
 <script type="module">
   import { DEFAULT_SIGNAL, SIGNALS } from '../src/signals.js';
   import { uiAssetsFor } from '../src/ui-assets.js';
-  import { renderPingLabel } from '../src/render-ping.js';
   const ui = uiAssetsFor(new URL('/', location.href));
   const select = document.querySelector('#signal');
   for (const signal of [DEFAULT_SIGNAL, ...SIGNALS]) select.add(new Option(signal.label, signal.id));
@@ -26,9 +26,9 @@
     const ping = document.querySelector('#ping');
     ping.src = image.url;
     const label = document.querySelector('#ping-label');
-    label.src = renderPingLabel(image, `${signal.name} · ${document.querySelector('#player').value}`).url;
-    await Promise.all([ping.decode(), label.decode()]);
-    document.querySelector('#status').textContent = 'PNG + label decoded';
+    label.textContent = `${signal.name} · ${document.querySelector('#player').value}`;
+    await ping.decode();
+    document.querySelector('#status').textContent = 'PNG decoded; text layout is a preview of the native label';
   }
   document.querySelector('#render').onclick = () => void render();
   select.onchange = () => void render();

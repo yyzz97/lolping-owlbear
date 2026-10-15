@@ -57,7 +57,7 @@ function makeBillboard(buildBillboard, image, point, width, dpi, itemType, name,
     .build();
 }
 
-export function registerExtension(OBR, { buildBillboard, signalAssets, wheelIcon, uiAssets, renderPingLabel, version = 'dev' }) {
+export function registerExtension(OBR, { buildBillboard, buildLabel, signalAssets, wheelIcon, uiAssets, version = 'dev' }) {
   let sceneKey = null;
   let sceneGeneration = 0;
   let gesture = null;
@@ -93,14 +93,29 @@ export function registerExtension(OBR, { buildBillboard, signalAssets, wheelIcon
     const dpi = await OBR.scene.grid.getDpi();
     if (!ready || key !== sceneKey) return false;
     const image = uiAssets.pings[signal.id];
-    const items = [image, renderPingLabel(image, label)].map(content =>
-      makeBillboard(buildBillboard, content, { x: message.x, y: message.y }, 200, dpi, 'ping', label,
-        { x: image.width / 2, y: 100 }));
+    const point = { x: message.x, y: message.y };
+    const icon = makeBillboard(buildBillboard, image, point, 200, dpi, 'ping', label,
+      { x: image.width / 2, y: 100 });
+    const text = buildLabel()
+      .id(`${EXTENSION_ID}/ping-label/${crypto.randomUUID()}`)
+      .name(label)
+      .plainText(Array.from(label).slice(0, 64).join(''))
+      .position(point)
+      .width(200).height(60).padding(0)
+      .fontFamily('Roboto').fontSize(13).fontWeight(700)
+      .textAlign('CENTER').textAlignVertical('BOTTOM')
+      .fillColor('#fff7e8').strokeColor('#111b20').strokeWidth(1)
+      .backgroundOpacity(0)
+      .pointerDirection('UP').pointerWidth(0).pointerHeight(0)
+      .zIndex(icon.zIndex + 1).layer('POPOVER')
+      .disableHit(true).disableAutoZIndex(true)
+      .build();
+    const items = [icon, text];
     const ids = items.map(item => item.id);
     const token = Symbol('ping');
     const entry = { ids, timer: null };
     localPings.set(token, entry);
-    // A rejected text image must not prevent the hosted icon from appearing.
+    // Native text avoids the host's image loader and its failure placeholder.
     void OBR.scene.local.addItems([items[0]]).then(() => {
       if (!localPings.has(token) || !ready || message.sceneKey !== sceneKey) {
         localPings.delete(token);
@@ -138,7 +153,7 @@ export function registerExtension(OBR, { buildBillboard, signalAssets, wheelIcon
     const point = { x: event.pointerPosition.x, y: event.pointerPosition.y };
     const current = {
       point, sceneKey, itemIds: [], hot: -1,
-      ready: false, tail: Promise.resolve(), pendingPosition: null, pendingFinish: null,
+      ready: false, updating: false, tail: Promise.resolve(), pendingPosition: null, pendingFinish: null,
     };
     gesture = current;
     try {
@@ -164,26 +179,33 @@ export function registerExtension(OBR, { buildBillboard, signalAssets, wheelIcon
   function move(event) {
     const current = gesture;
     if (!current || !Number.isFinite(event.pointerPosition?.x) || !Number.isFinite(event.pointerPosition?.y)) return;
-    const position = { x: event.pointerPosition.x, y: event.pointerPosition.y };
-    if (!current.ready) {
-      current.pendingPosition = position;
-      return;
-    }
-    current.tail = current.tail.then(async () => {
-      if (gesture !== current) return;
-      const scale = await OBR.viewport.getScale();
-      if (gesture !== current || !Number.isFinite(scale) || scale <= 0) return;
-      const next = pickSlice((position.x - current.point.x) * scale, (position.y - current.point.y) * scale);
-      if (next === current.hot) return;
-      current.hot = next;
-      const signal = next < 0 ? DEFAULT_SIGNAL : SIGNALS[next];
-      await OBR.scene.local.updateItems(current.itemIds, items => {
-        for (const item of items) {
-          item.image = uiAssets.wheels[signal.id];
-          item.name = signal.label;
+    current.pendingPosition = { x: event.pointerPosition.x, y: event.pointerPosition.y };
+    if (!current.ready || current.updating) return;
+    current.updating = true;
+    current.tail = (async () => {
+      try {
+        while (gesture === current && current.pendingPosition) {
+          const scale = await OBR.viewport.getScale();
+          if (gesture !== current) return;
+          // Read the newest position after the host replies, skipping stale moves.
+          const position = current.pendingPosition;
+          current.pendingPosition = null;
+          if (!Number.isFinite(scale) || scale <= 0) continue;
+          const next = pickSlice((position.x - current.point.x) * scale, (position.y - current.point.y) * scale);
+          if (next === current.hot) continue;
+          current.hot = next;
+          const signal = next < 0 ? DEFAULT_SIGNAL : SIGNALS[next];
+          await OBR.scene.local.updateItems(current.itemIds, items => {
+            for (const item of items) {
+              item.image = uiAssets.wheels[signal.id];
+              item.name = signal.label;
+            }
+          });
         }
-      });
-    }).catch(error => console.error('[lolPing] Wheel preview failed', error));
+      } finally {
+        current.updating = false;
+      }
+    })().catch(error => console.error('[lolPing] Wheel preview failed', error));
   }
 
   async function finish(event) {

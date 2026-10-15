@@ -1,7 +1,6 @@
-import OBR, { buildBillboard } from '@owlbear-rodeo/sdk';
+import OBR, { buildBillboard, buildLabel } from '@owlbear-rodeo/sdk';
 import { registerExtension } from './extension.js';
-import { uiAssetsFor } from './ui-assets.js';
-import { renderPingLabel } from './render-ping.js';
+import { uiAssetsFor, preloadImages } from './ui-assets.js';
 import packageJson from '../package.json';
 
 const wheelIcon = new URL('./wheel.svg', document.baseURI).href;
@@ -21,4 +20,6 @@ const signalAssets = Object.freeze({
   caution: asset('Caution_ping'),
 });
 
-registerExtension(OBR, { buildBillboard, signalAssets, wheelIcon, uiAssets: uiAssetsFor(document.baseURI), renderPingLabel, version: packageJson.version });
+const uiAssets = uiAssetsFor(document.baseURI);
+void preloadImages(uiAssets);
+registerExtension(OBR, { buildBillboard, buildLabel, signalAssets, wheelIcon, uiAssets, version: packageJson.version });

@@ -8,3 +8,11 @@ export function uiAssetsFor(base) {
     pings: Object.fromEntries(ids.map(id => [id, image(`ping-${id}`, 400, 256)])),
   };
 }
+
+export function preloadImages(uiAssets) {
+  return Promise.allSettled([...Object.values(uiAssets.wheels), ...Object.values(uiAssets.pings)].map(async content => {
+    const image = new Image();
+    image.src = content.url;
+    await image.decode();
+  }));
+}
