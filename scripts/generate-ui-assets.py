@@ -11,13 +11,13 @@ CANVAS = 728
 CENTER = CANVAS // 2
 INNER = 85
 CARDINAL_OUTER = 180
-DIAGONAL_OUTER = 160
+DIAGONAL_OUTER = 150
 
 def sector_radius(index):
     return CARDINAL_OUTER if index % 2 == 0 else DIAGONAL_OUTER
 
 def sector_image(index, selected):
-    rgb, opacity = ((24, 160, 218), 0.64) if selected else ((0, 0, 0), 0.60 if index % 2 == 0 else 0.48)
+    rgb, opacity = ((24, 160, 218), 0.64) if selected else ((0, 0, 0), 0.68 if index % 2 == 0 else 0.38)
     image = Image.new("RGBA", (CANVAS, CANVAS))
     pixels = image.load()
     radius_limit = sector_radius(index)
@@ -53,12 +53,13 @@ for name, color in colors.items():
     for y in range(176):
         for x in range(256):
             dx, dy = (x + 0.5) / 2 - 64, (y + 0.5) / 2 - 44
-            radius = hypot(dx / 36, dy / 23)
-            distance = (radius - 1) * 28
-            glow = 0.32 * exp(-(distance / 6) ** 2)
-            rim = 0.64 * exp(-(distance / 1.15) ** 2)
-            interior = 0.045 * max(0, 1 - radius) if radius < 1 else 0
-            pixels[x, y] = (*rgb, round(255 * min(1, glow + rim + interior)))
+            outer = hypot(dx / 26, dy / 16)
+            inner = hypot(dx / 20, dy / 10.5)
+            outer_distance = (outer - 1) * 28
+            inner_distance = (inner - 1) * 28
+            glow = 0.25 * exp(-(outer_distance / 5.5) ** 2) + 0.20 * exp(-(inner_distance / 5.5) ** 2)
+            rim = 0.72 * exp(-(outer_distance / 1.15) ** 2) + 0.64 * exp(-(inner_distance / 1.15) ** 2)
+            pixels[x, y] = (*rgb, round(255 * min(1, glow + rim)))
     image.save(OUTPUT / f"ring-{name}.png", optimize=True)
 
 image = Image.new("RGBA", (128, 64))

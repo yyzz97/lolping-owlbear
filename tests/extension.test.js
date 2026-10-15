@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { registerExtension, CHANNEL, DISPLAY_MS, EXTENSION_ID } from '../src/extension.js';
+import { registerExtension, ACTION_ID, CHANNEL, DISPLAY_MS, EXTENSION_ID } from '../src/extension.js';
 import { uiAssetsFor } from '../src/ui-assets.js';
 
 const TEST_WHEEL_ICON = 'https://static.example.test/wheel.svg';
@@ -78,13 +78,18 @@ function makeOwlbear(scale = 2, {
         if (modeCreateError) throw modeCreateError;
         modes.set(mode.id, mode);
       },
+      async createAction(action) { registeredTools.set(action.id, action); },
       async remove(id) { registeredTools.delete(id); },
       async removeMode(id) { modes.delete(id); },
+      async removeAction(id) { registeredTools.delete(id); },
     },
     notification: {
       async show(message, variant) { notifications.push({ message, variant }); },
     },
-    viewport: { async getScale() { return scale; }, async setScale(value) { scale = value; } },
+    viewport: {
+      async getScale() { return scale; }, async setScale(value) { scale = value; },
+      async inverseTransformPoint(point) { return point; },
+    },
     party: {
       async getPlayers() { return [{ connectionId: 'bob-connection', name: 'Bob' }]; },
       onChange(callback) { listeners.push(callback); return () => {}; },
@@ -161,8 +166,9 @@ test('registers the toolbar and mode with the hosted wheel icon URL', async t =>
   const mode = fake.modes.values().next().value;
   assert.equal(tool.icons[0].icon, TEST_WHEEL_ICON);
   assert.equal(mode.icons[0].icon, TEST_WHEEL_ICON);
-  assert.equal(tool.shortcut, 'G');
-  assert.equal(mode.shortcut, 'G');
+  assert.equal(tool.shortcut, undefined);
+  assert.equal(mode.shortcut, undefined);
+  assert.equal(fake.registeredTools.get(ACTION_ID).shortcut, 'G');
   assert.ok(fake.notifications.some(({ message, variant }) => message.includes('已加载') && variant === 'SUCCESS'));
 });
 

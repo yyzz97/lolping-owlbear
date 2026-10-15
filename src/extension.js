@@ -6,6 +6,7 @@ import { playPing, unlockAudio } from './audio.js';
 export const EXTENSION_ID = 'com.github.dmhpj.lolping-owlbear';
 export const TOOL_ID = `${EXTENSION_ID}/tool`;
 export const MODE_ID = `${TOOL_ID}/mode`;
+export const ACTION_ID = `${EXTENSION_ID}/shortcut`;
 export const CHANNEL = `${EXTENSION_ID}/pings`;
 export const DISPLAY_MS = 2000;
 export const PING_WINDOW_MS = 5000;
@@ -71,6 +72,8 @@ export function registerExtension(OBR, { buildBillboard, buildLabel, signalAsset
   let shortcutHeld = false;
   let sendTimes = [];
   let blockedUntil = 0;
+  let globalInputBound = false;
+  let restoreTool = null;
   const unsubscribers = [];
 
   function deleteIds(ids) {
@@ -81,6 +84,34 @@ export function registerExtension(OBR, { buildBillboard, buildLabel, signalAsset
     const current = gesture;
     gesture = null;
     if (current) deleteIds(current.itemIds);
+  }
+
+  async function restorePreviousTool() {
+    const previous = restoreTool;
+    restoreTool = null;
+    if (!previous || typeof OBR.tool.activateTool !== 'function') return;
+    try {
+      await OBR.tool.activateTool(previous.toolId);
+      if (previous.modeId && typeof OBR.tool.activateMode === 'function') {
+        await OBR.tool.activateMode(previous.toolId, previous.modeId);
+      }
+    } catch {
+      // The previous tool may have been removed while the gesture was active.
+    }
+  }
+
+  async function activateShortcutTool() {
+    if (typeof OBR.tool.getActiveTool !== 'function' || typeof OBR.tool.activateTool !== 'function') return;
+    try {
+      const activeTool = await OBR.tool.getActiveTool();
+      if (activeTool === TOOL_ID) return;
+      const activeMode = typeof OBR.tool.getActiveToolMode === 'function'
+        ? await OBR.tool.getActiveToolMode() : undefined;
+      restoreTool = { toolId: activeTool, modeId: activeMode };
+      await OBR.tool.activateTool(TOOL_ID);
+    } catch {
+      restoreTool = null;
+    }
   }
 
   function clearPings() {
@@ -241,9 +272,13 @@ export function registerExtension(OBR, { buildBillboard, buildLabel, signalAsset
     const signal = current.hot < 0 ? DEFAULT_SIGNAL : SIGNALS[current.hot];
     const now = Date.now();
     sendTimes = sendTimes.filter(timestamp => now - timestamp < PING_WINDOW_MS);
-    if (now < blockedUntil || sendTimes.length >= PING_LIMIT) {
-      blockedUntil = Math.max(blockedUntil, now + PING_COOLDOWN_MS);
-      void OBR.notification.show(`信号过于频繁，请 ${Math.ceil((blockedUntil - now) / 1000)} 秒后再试。`, 'WARNING').catch(() => {});
+    if (now < blockedUntil) {
+      void OBR.notification.show(`信号冷却中，还需 ${Math.ceil((blockedUntil - now) / 1000)} 秒。`, 'WARNING').catch(() => {});
+      return;
+    }
+    if (sendTimes.length >= PING_LIMIT) {
+      blockedUntil = now + PING_COOLDOWN_MS;
+      void OBR.notification.show('信号过于频繁，已进入 12 秒冷却。', 'WARNING').catch(() => {});
       return;
     }
     sendTimes.push(now);
@@ -285,6 +320,63 @@ export function registerExtension(OBR, { buildBillboard, buildLabel, signalAsset
     if (isReady) void startScene(sceneGeneration);
   }
 
+  function isShortcutKey(event) {
+    return event?.code === 'KeyG' || event?.key?.toLowerCase() === 'g';
+  }
+
+  async function screenToolEvent(event) {
+    const screenPoint = { x: event.clientX, y: event.clientY };
+    const pointerPosition = typeof OBR.viewport.inverseTransformPoint === 'function'
+      ? await OBR.viewport.inverseTransformPoint(screenPoint)
+      : screenPoint;
+    return { pointerPosition, altKey: event.altKey, shiftKey: event.shiftKey, ctrlKey: event.ctrlKey, metaKey: event.metaKey };
+  }
+
+  function bindGlobalInput() {
+    if (globalInputBound || typeof document === 'undefined' || typeof document.addEventListener !== 'function') return;
+    globalInputBound = true;
+    const keyDown = event => {
+      if (isShortcutKey(event)) {
+        shortcutHeld = true;
+        void unlockAudio();
+      } else if (event.key === 'Escape') {
+        cancelWheel();
+      }
+    };
+    const keyUp = event => {
+      if (isShortcutKey(event)) {
+        shortcutHeld = false;
+        if (gesture?.shortcutGesture) cancelWheel();
+        void restorePreviousTool();
+      }
+    };
+    const pointerDown = event => {
+      if (event.button !== 0 || !shortcutHeld || gesture) return;
+      void screenToolEvent(event).then(begin).catch(() => {});
+    };
+    const pointerMove = event => {
+      if (!gesture?.shortcutGesture) return;
+      void screenToolEvent(event).then(move).catch(() => {});
+    };
+    const pointerUp = event => {
+      if (!gesture?.shortcutGesture) return;
+      void screenToolEvent(event).then(finish).catch(() => {});
+    };
+    document.addEventListener('keydown', keyDown, true);
+    document.addEventListener('keyup', keyUp, true);
+    document.addEventListener('pointerdown', pointerDown, true);
+    document.addEventListener('pointermove', pointerMove, true);
+    document.addEventListener('pointerup', pointerUp, true);
+    unsubscribers.push(() => {
+      document.removeEventListener('keydown', keyDown, true);
+      document.removeEventListener('keyup', keyUp, true);
+      document.removeEventListener('pointerdown', pointerDown, true);
+      document.removeEventListener('pointermove', pointerMove, true);
+      document.removeEventListener('pointerup', pointerUp, true);
+      globalInputBound = false;
+    });
+  }
+
   unsubscribers.push(OBR.onReady(async () => {
     if (closed) return;
     try {
@@ -292,7 +384,6 @@ export function registerExtension(OBR, { buildBillboard, buildLabel, signalAsset
         id: TOOL_ID,
         icons: [{ icon: wheelIcon, label: '英雄联盟信号轮盘' }],
         defaultMode: MODE_ID,
-        shortcut: 'G',
       });
     } catch (error) {
       reportStartupError(OBR, '工具栏注册', error);
@@ -319,12 +410,21 @@ export function registerExtension(OBR, { buildBillboard, buildLabel, signalAsset
           if (event.key?.toLowerCase() === 'g' || event.code === 'KeyG') {
             shortcutHeld = false;
             if (gesture) cancelWheel();
+            void restorePreviousTool();
           }
         },
-        shortcut: 'G',
         onDeactivate: cancelWheel,
         onActivate: () => {
           void OBR.notification.show('按住 G 和鼠标左键打开轮盘，移动到方向后松开左键发送；松开 G 或按 Esc 取消。', 'INFO').catch(() => {});
+        },
+      });
+      await OBR.tool.createAction({
+        id: ACTION_ID,
+        shortcut: 'G',
+        icons: [{ icon: wheelIcon, label: 'G+鼠标左键信号轮盘', filter: { activeTools: [`${ACTION_ID}/hidden`] } }],
+        onClick: () => {
+          shortcutHeld = true;
+          void activateShortcutTool();
         },
       });
     } catch (error) {
@@ -350,6 +450,7 @@ export function registerExtension(OBR, { buildBillboard, buildLabel, signalAsset
         }
       }));
       void refreshParty();
+      bindGlobalInput();
       if (await OBR.scene.isReady()) sceneChanged(true);
     } catch (error) {
       reportStartupError(OBR, '房间事件初始化', error);
@@ -364,6 +465,7 @@ export function registerExtension(OBR, { buildBillboard, buildLabel, signalAsset
     clearPings();
     for (const unsubscribe of unsubscribers) unsubscribe?.();
     void OBR.tool.removeMode(MODE_ID).catch(() => {});
+    void OBR.tool.removeAction(ACTION_ID).catch(() => {});
     void OBR.tool.remove(TOOL_ID).catch(() => {});
   };
 }
