@@ -503,6 +503,20 @@ test('G shortcut keeps the wheel gesture active until the left button is release
   assert.equal(fake.messages[0].data.signalId, 'omw');
 });
 
+test('activating the tool through its G shortcut arms the default mode before pointer down', async t => {
+  const fake = await setup(t, 1);
+  const mode = fake.modes.values().next().value;
+  mode.onActivate({});
+  mode.onToolDown({}, event(300, 300));
+  await flush();
+  mode.onToolMove({}, event(450, 300));
+  await flush();
+  mode.onToolUp({}, event(450, 300));
+  await flush();
+  assert.equal(fake.messages.length, 1);
+  assert.equal(fake.messages[0].data.signalId, 'omw');
+});
+
 test('the fifth ping within five seconds starts the twelve second cooldown', async t => {
   const fake = await setup(t, 1);
   const mode = fake.modes.values().next().value;

@@ -411,6 +411,9 @@ export function registerExtension(OBR, { buildBillboard, buildLabel, signalAsset
         },
         onDeactivate: cancelWheel,
         onActivate: () => {
+          // Tool.shortcut activates the default mode before the first map
+          // pointer event; treat that activation as the held-G gesture.
+          shortcutHeld = true;
           if (!restoreTool && lastActiveTool && lastActiveTool !== TOOL_ID) {
             restoreTool = { toolId: lastActiveTool, modeId: lastActiveMode };
           }
