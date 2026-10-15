@@ -114,7 +114,7 @@ function makeSignalIcon({ signalId, point, scale, buildPath, buildBillboard, sig
   if (buildBillboard && asset?.imageUrl) {
     return buildBillboard(
       { width: asset.width, height: asset.height, mime: 'image/png', url: asset.imageUrl },
-      { offset: { x: 0, y: 0 }, dpi: 1 },
+      { offset: { x: asset.width / 2, y: asset.height / 2 }, dpi: 1 },
     )
       .id(`${EXTENSION_ID}/${itemType}/${crypto.randomUUID()}`)
       .position(point)

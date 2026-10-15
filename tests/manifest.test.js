@@ -9,7 +9,7 @@ test('manifest identifies the Owlbear extension and local resource paths', async
   assert.equal(manifest.homepage_url, 'https://github.com/yyzz97/lolping-owlbear');
   assert.match(manifest.name, /Owlbear Rodeo/);
   assert.equal(manifest.author, 'yyzz97');
-  assert.equal(manifest.version, '1.0.7');
+  assert.equal(manifest.version, '1.0.8');
   assert.equal(manifest.background_url, '/index.html');
   assert.equal(manifest.icon, '/wheel.svg');
 });

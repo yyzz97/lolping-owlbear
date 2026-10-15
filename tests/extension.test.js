@@ -43,8 +43,8 @@ function builder(type) {
 }
 
 function billboardBuilder() {
-  return ({ width, height, mime, url }) => {
-    const item = { id: crypto.randomUUID(), type: 'BILLBOARD', image: { width, height, mime, url }, grid: { offset: { x: 0, y: 0 }, dpi: 1 } };
+  return ({ width, height, mime, url }, grid) => {
+    const item = { id: crypto.randomUUID(), type: 'BILLBOARD', image: { width, height, mime, url }, grid };
     const proxy = new Proxy({}, {
       get(_target, method) {
         if (method === 'build') return () => structuredClone(item);
@@ -392,6 +392,7 @@ test('uses supplied PNG assets for the wheel, selected center, and map marker', 
   const wheelImages = [...fake.items.values()].filter(item => item.type === 'BILLBOARD');
   assert.equal(wheelImages.length, 9);
   assert.ok(wheelImages.every(item => item.image.url.endsWith('.png')));
+  assert.ok(wheelImages.every(item => item.grid.offset.x === item.image.width / 2 && item.grid.offset.y === item.image.height / 2));
   assert.ok(wheelImages.slice(0, 8).every(item => item.scale.x * item.image.width === WHEEL.iconSize));
   mode.onToolMove({}, event(100, 400));
   await flush();

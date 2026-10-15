@@ -10,7 +10,7 @@ This is a standalone Owlbear Rodeo 2 extension built with `@owlbear-rodeo/sdk`. 
 4. On the map, hold the left mouse button to open the wheel, drag toward one of eight signals, then release to send it. The center shows the selected signal; release near the center or press **Esc** to cancel.
 5. Everyone in the same room with the extension enabled sees the same scene-point ping, the sender name, and the signal name. Signals stack when they overlap and fade after three seconds.
 
-The wheel uses a compact dark center disc, thin gold radial guides, and the supplied signal PNGs for the wheel, center preview, and map marker. PNG markers use Owlbear billboards for a stable screen size; the wheel, ring, and label compensate for the current viewport scale. A sent ping shows its signal icon above an open oval ring with a short sender/signal label below. The signal is anchored to the point where the gesture began. The supplied OGG cues are played locally; Web Audio remains a fallback when a browser blocks or cannot load a cue. Bait uses the supplied `Bait_ping_SFX.ogg`.
+The wheel uses a compact dark center disc, thin gold radial guides, and the supplied signal PNGs for the wheel, center preview, and map marker. PNG markers use centered Owlbear billboards for a stable screen size; the wheel, ring, and label compensate for the current viewport scale. A sent ping shows its signal icon above an open oval ring with a short sender/signal label below. The signal is anchored to the point where the gesture began. The supplied OGG cues are played locally; Web Audio remains a fallback when a browser blocks or cannot load a cue. Bait uses the supplied `Bait_ping_SFX.ogg`.
 
 ## Develop
 
