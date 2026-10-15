@@ -344,7 +344,7 @@ test('wheel geometry, icon offsets, and pings keep a fixed screen size at differ
     assert.equal(pingLabel.scale.y * scale, 1);
     assert.equal(ring.scale.x * scale, 1);
     assert.equal(ring.scale.y * scale, 1);
-    assert.equal(pingIcon.scale.x * pingIcon.image.width, 48);
+    assert.equal(pingIcon.scale.x * pingIcon.image.width / pingIcon.grid.dpi * 96, 48);
     assert.equal((pingLabel.position.y - 52 / scale) * scale, 0);
 
     const mode = fake.modes.values().next().value;
@@ -352,7 +352,7 @@ test('wheel geometry, icon offsets, and pings keep a fixed screen size at differ
     await flush();
     const wheelIcons = [...fake.items.values()].filter(item => item.id.includes('/wheel-glyph/'));
     assert.equal(wheelIcons.length, 8);
-    for (const item of wheelIcons) assert.equal(item.scale.x * item.image.width, WHEEL.iconSize);
+    for (const item of wheelIcons) assert.equal(item.scale.x * item.image.width / item.grid.dpi * 96, WHEEL.iconSize);
     const center = [...fake.items.values()].find(item => item.id.includes('/center-label/'));
     assert.equal(center.scale.x * scale, 1);
     assert.equal(WHEEL.innerRadius, 102);
@@ -392,13 +392,14 @@ test('uses supplied PNG assets for the wheel, selected center, and map marker', 
   const wheelImages = [...fake.items.values()].filter(item => item.type === 'BILLBOARD');
   assert.equal(wheelImages.length, 9);
   assert.ok(wheelImages.every(item => item.image.url.endsWith('.png')));
+  assert.ok(wheelImages.every(item => item.grid.dpi === item.image.width));
   assert.ok(wheelImages.every(item => item.grid.offset.x === item.image.width / 2 && item.grid.offset.y === item.image.height / 2));
-  assert.ok(wheelImages.slice(0, 8).every(item => item.scale.x * item.image.width === WHEEL.iconSize));
+  assert.ok(wheelImages.slice(0, 8).every(item => item.scale.x * item.image.width / item.grid.dpi * 96 === WHEEL.iconSize));
   mode.onToolMove({}, event(100, 400));
   await flush();
   const center = [...fake.items.values()].find(item => item.id.includes('/center-glyph/'));
   assert.equal(center.image.url, signalAssets.assist.imageUrl);
-  assert.equal(center.scale.x * signalAssets.assist.width, 36);
+  assert.equal(center.scale.x * center.image.width / center.grid.dpi * 96, 36);
   mode.onToolUp({}, event(100, 400));
   await flush();
   const marker = [...fake.items.values()].find(item => item.id.includes('/ping-glyph/'));

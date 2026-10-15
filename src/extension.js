@@ -114,11 +114,11 @@ function makeSignalIcon({ signalId, point, scale, buildPath, buildBillboard, sig
   if (buildBillboard && asset?.imageUrl) {
     return buildBillboard(
       { width: asset.width, height: asset.height, mime: 'image/png', url: asset.imageUrl },
-      { offset: { x: asset.width / 2, y: asset.height / 2 }, dpi: 1 },
+      { offset: { x: asset.width / 2, y: asset.height / 2 }, dpi: asset.width },
     )
       .id(`${EXTENSION_ID}/${itemType}/${crypto.randomUUID()}`)
       .position(point)
-      .scale({ x: size / asset.width, y: size / asset.height })
+      .scale({ x: size / 96, y: size / 96 })
       .layer('POPOVER')
       .disableHit(true)
       .disableAutoZIndex(true)
@@ -400,7 +400,7 @@ export function registerExtension(OBR, { buildBillboard, buildPath, buildLabel, 
             const asset = signalAssets[signal.id];
             item.image = { width: asset.width, height: asset.height, mime: 'image/png', url: asset.imageUrl };
             const centerSize = 36;
-            item.scale = { x: centerSize / asset.width, y: centerSize / asset.height };
+            item.scale = { x: centerSize / 96, y: centerSize / 96 };
           } else {
             item.text.plainText = signal.label;
             item.text.style.fillColor = signal.color;
