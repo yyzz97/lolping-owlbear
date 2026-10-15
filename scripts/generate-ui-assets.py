@@ -97,10 +97,10 @@ def draw_base():
     draw = ImageDraw.Draw(canvas)
     for index in range(8):
         angle = (-112.5 + index * 45) * pi / 180
-        radius = sector_radius(index)
+        radius = CARDINAL_OUTER
         draw.line(((center + INNER * cos(angle)) * SCALE, (center + INNER * sin(angle)) * SCALE,
                    (center + radius * cos(angle)) * SCALE, (center + radius * sin(angle)) * SCALE),
-                  fill=(200, 170, 110, 180), width=2)
+                  fill=(210, 180, 112, 210), width=2)
     draw.ellipse(((center - inner) * SCALE, (center - inner) * SCALE,
                   (center + inner) * SCALE, (center + inner) * SCALE),
                  fill=(11, 36, 38, 210), outline=(200, 170, 110, 250), width=3)
