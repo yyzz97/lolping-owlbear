@@ -29,7 +29,15 @@ def sector_image(index, selected):
             if INNER <= radius <= radius_limit and angle < 45:
                 edge = min(1, angle / 0.8, (45 - angle) / 0.8, (radius - INNER) / 0.8,
                            (radius_limit - radius) / 0.8)
-                radial = max(0, 1 - (radius - INNER) / max(1, radius_limit - INNER)) ** 0.7 if selected else 1
+                distance = (radius - INNER) / max(1, radius_limit - INNER)
+                if selected:
+                    radial = max(0, 1 - distance) ** 0.7
+                elif index % 2 == 0:
+                    # Keep a subtle inner-to-outer falloff on the four
+                    # cardinal wedges while diagonals stay flat black.
+                    radial = 0.82 - 0.62 * max(0, min(1, distance))
+                else:
+                    radial = 1
                 pixels[x, y] = (*rgb, round(255 * opacity * radial * edge))
     return image
 
@@ -83,16 +91,16 @@ def paste_icon(canvas, signal, point, size):
 
 def draw_base():
     canvas = Image.new('RGBA', (CANVAS, CANVAS))
+    center = CENTER / SCALE
     for index in range(8):
         canvas.alpha_composite(Image.open(OUTPUT / f'sector-{index}-idle.png'))
     draw = ImageDraw.Draw(canvas)
     for index in range(8):
         angle = (-112.5 + index * 45) * pi / 180
         radius = sector_radius(index)
-        draw.line(((CENTER + INNER * cos(angle)) * SCALE, (CENTER + INNER * sin(angle)) * SCALE,
-                   (CENTER + radius * cos(angle)) * SCALE, (CENTER + radius * sin(angle)) * SCALE),
+        draw.line(((center + INNER * cos(angle)) * SCALE, (center + INNER * sin(angle)) * SCALE,
+                   (center + radius * cos(angle)) * SCALE, (center + radius * sin(angle)) * SCALE),
                   fill=(200, 170, 110, 180), width=2)
-    center = CENTER / SCALE
     draw.ellipse(((center - inner) * SCALE, (center - inner) * SCALE,
                   (center + inner) * SCALE, (center + inner) * SCALE),
                  fill=(11, 36, 38, 210), outline=(200, 170, 110, 250), width=3)
