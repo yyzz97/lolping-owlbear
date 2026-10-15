@@ -198,7 +198,7 @@ test('dragging updates one wheel image and broadcasts the original scene point',
   const marker = [...fake.items.values()][0];
   assert.equal(marker.name, '正在路上 · Alice');
   assert.equal(marker.image.url, TEST_UI_ASSETS.pings.omw.url);
-  assert.match([...fake.items.values()][1].image.url, /^data:image\/svg\+xml,/);
+  assert.match([...fake.items.values()][1].image.url, /^data:image\/svg\+xml;base64,/);
 });
 
 test('center release sends caution with its audio and Escape cancels', async t => {
@@ -338,7 +338,30 @@ test('a rejected ping image reports a rendering error instead of failing silentl
     sceneKey: fake.metadata[EXTENSION_ID].sceneKey, signalId: 'missing', x: 0, y: 0 }, connectionId: 'bob-connection' });
   await flush();
   assert.equal(fake.items.size, 0);
-  assert.ok(fake.notifications.some(({ message, variant }) => message.includes('信号绘制失败') && variant === 'ERROR'));
+  assert.ok(fake.notifications.some(({ message, variant }) => message.includes('信号图标绘制失败：image rejected') && variant === 'ERROR'));
+});
+
+test('a rejected label keeps the hosted icon visible and cleans it up on time', async t => {
+  const fake = await setup(t);
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const addItems = fake.obr.scene.local.addItems;
+  fake.obr.scene.local.addItems = async items => {
+    if (items.some(item => item.image.mime === 'image/svg+xml')) {
+      const error = new Error('items do not match');
+      error.details = [{ context: { message: '"items[0].image.url" must be a valid uri' } }];
+      throw error;
+    }
+    return addItems(items);
+  };
+  fake.messageHandler({ data: { v: 1, type: 'ping', eventId: 'rejected-label', userId: 'bob',
+    sceneKey: fake.metadata[EXTENSION_ID].sceneKey, signalId: 'missing', x: 120, y: 240 }, connectionId: 'bob-connection' });
+  await flush();
+  assert.equal(fake.items.size, 1);
+  assert.equal([...fake.items.values()][0].image.url, TEST_UI_ASSETS.pings.missing.url);
+  assert.ok(fake.notifications.some(({ message }) => message.includes('lolPing test 信号文字绘制失败："items[0].image.url" must be a valid uri')));
+  t.mock.timers.tick(DISPLAY_MS);
+  await flush();
+  assert.equal(fake.items.size, 0);
 });
 
 test('players share scene identity when metadata is read-only', async t => {

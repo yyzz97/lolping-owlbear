@@ -5,5 +5,6 @@ export function renderPingLabel(image, label) {
     character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' })[character]);
   const fit = Array.from(label).length > 24 ? ' textLength="376" lengthAdjust="spacingAndGlyphs"' : '';
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="256"><text x="200" y="204" text-anchor="middle" dominant-baseline="middle" font-family="sans-serif" font-size="26" font-weight="700" fill="#fff7e8" stroke="#111b20" stroke-width="1" paint-order="stroke"${fit}>${text}</text></svg>`;
-  return { ...image, mime: 'image/svg+xml', url: `data:image/svg+xml,${encodeURIComponent(svg)}` };
+  const encoded = btoa(String.fromCharCode(...new TextEncoder().encode(svg)));
+  return { ...image, mime: 'image/svg+xml', url: `data:image/svg+xml;base64,${encoded}` };
 }

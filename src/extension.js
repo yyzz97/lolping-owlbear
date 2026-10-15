@@ -17,9 +17,11 @@ function reportStartupError(OBR, stage, error) {
   void OBR.notification.show(`lolPing ${stage}失败，工具栏可能不会显示。请刷新房间。`, 'ERROR').catch(() => {});
 }
 
-function reportRenderError(OBR, error) {
+function reportRenderError(OBR, error, version, stage = '信号') {
   console.error('[lolPing] Rendering failed', error);
-  void OBR.notification.show('lolPing 信号绘制失败，请刷新房间。', 'ERROR').catch(() => {});
+  const detail = error.details?.[0]?.context?.message ?? error.message ?? String(error);
+  const reason = detail.match(/"items\[\d+\]\.(?:image|grid|style)[^"]*"[^.]+/)?.[0] ?? detail;
+  void OBR.notification.show(`lolPing ${version} ${stage}绘制失败：${reason.slice(0, 220)}`, 'ERROR').catch(() => {});
 }
 
 async function sceneKeyFor(OBR) {
@@ -98,7 +100,8 @@ export function registerExtension(OBR, { buildBillboard, signalAssets, wheelIcon
     const token = Symbol('ping');
     const entry = { ids, timer: null };
     localPings.set(token, entry);
-    void OBR.scene.local.addItems(items).then(() => {
+    // A rejected text image must not prevent the hosted icon from appearing.
+    void OBR.scene.local.addItems([items[0]]).then(() => {
       if (!localPings.has(token) || !ready || message.sceneKey !== sceneKey) {
         localPings.delete(token);
         deleteIds(ids);
@@ -108,9 +111,12 @@ export function registerExtension(OBR, { buildBillboard, signalAssets, wheelIcon
         localPings.delete(token);
         deleteIds(ids);
       }, DISPLAY_MS);
+      return OBR.scene.local.addItems([items[1]]).then(() => {
+        if (!localPings.has(token)) deleteIds([items[1].id]);
+      }).catch(error => reportRenderError(OBR, error, version, '信号文字'));
     }).catch(error => {
       localPings.delete(token);
-      reportRenderError(OBR, error);
+      reportRenderError(OBR, error, version, '信号图标');
     });
     await unlockAudio();
     playPing(signal.id, signalAssets?.[signal.id]?.audioUrl);
@@ -143,7 +149,7 @@ export function registerExtension(OBR, { buildBillboard, signalAssets, wheelIcon
       await OBR.scene.local.addItems(items);
     } catch (error) {
       if (gesture === current) cancelWheel();
-      reportRenderError(OBR, error);
+      reportRenderError(OBR, error, version, '轮盘');
       return;
     }
     if (gesture !== current) {
@@ -202,14 +208,14 @@ export function registerExtension(OBR, { buildBillboard, signalAssets, wheelIcon
     } catch {
       // Keep a generic name when the host does not provide one.
     }
-    void showPing(message, sender).catch(error => reportRenderError(OBR, error));
+    void showPing(message, sender).catch(error => reportRenderError(OBR, error, version));
     void OBR.broadcast.sendMessage(CHANNEL, message, { destination: 'REMOTE' }).catch(() => {});
   }
 
   function receive(event) {
     const message = parsePing(event.data);
     if (!message || message.userId === OBR.player.id && event.connectionId === undefined) return;
-    void showPing(message, players.get(event.connectionId) ?? '房间玩家').catch(error => reportRenderError(OBR, error));
+    void showPing(message, players.get(event.connectionId) ?? '房间玩家').catch(error => reportRenderError(OBR, error, version));
   }
 
   async function startScene(generation) {
