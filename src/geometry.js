@@ -1,4 +1,4 @@
-export const WHEEL = Object.freeze({ innerRadius: 85, outerRadius: 170, iconRadius: 128, iconSize: 42 });
+export const WHEEL = Object.freeze({ innerRadius: 85, outerRadius: 170, renderOuterRadius: 180, iconRadius: 128, iconSize: 42 });
 
 export function pickSlice(dx, dy, deadZone = WHEEL.innerRadius) {
   if (!Number.isFinite(dx) || !Number.isFinite(dy) || Math.hypot(dx, dy) < deadZone) return -1;

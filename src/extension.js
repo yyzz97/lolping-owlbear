@@ -44,13 +44,13 @@ async function sceneKeyFor(OBR) {
   }
 }
 
-function makeBillboard(buildBillboard, image, point, width, dpi, itemType, name, offset) {
+function makeBillboard(buildBillboard, image, point, width, dpi, itemType, name, offset, zOffset = 0) {
   return buildBillboard(image, { offset: offset ?? { x: image.width / 2, y: image.height / 2 }, dpi })
     .id(`${EXTENSION_ID}/${itemType}/${crypto.randomUUID()}`)
     .name(name)
     .position(point)
     .scale({ x: width / image.width, y: width / image.width })
-    .zIndex(Date.now())
+    .zIndex(Date.now() + zOffset)
     .layer('POPOVER')
     .disableHit(true)
     .disableAutoZIndex(true)
@@ -159,7 +159,12 @@ export function registerExtension(OBR, { buildBillboard, buildLabel, signalAsset
     try {
       const dpi = await OBR.scene.grid.getDpi();
       if (!ready || gesture !== current || current.sceneKey !== sceneKey) return;
-      const items = [makeBillboard(buildBillboard, uiAssets.wheels.caution, point, WHEEL.outerRadius * 2 + 4, dpi, 'wheel', DEFAULT_SIGNAL.label)];
+      const wheelWidth = WHEEL.renderOuterRadius * 2 + 4;
+      const items = [
+        makeBillboard(buildBillboard, uiAssets.wheelBase, point, wheelWidth, dpi, 'wheel-base', 'wheel base', undefined, 0),
+        makeBillboard(buildBillboard, uiAssets.wheelSelectionNone, point, wheelWidth, dpi, 'wheel-selection', 'wheel selection', undefined, 1),
+        makeBillboard(buildBillboard, uiAssets.wheelCenters.caution, point, wheelWidth, dpi, 'wheel-center', DEFAULT_SIGNAL.label, undefined, 2),
+      ];
       current.itemIds = items.map(item => item.id);
       await OBR.scene.local.addItems(items);
     } catch (error) {
@@ -197,8 +202,9 @@ export function registerExtension(OBR, { buildBillboard, buildLabel, signalAsset
           const signal = next < 0 ? DEFAULT_SIGNAL : SIGNALS[next];
           await OBR.scene.local.updateItems(current.itemIds, items => {
             for (const item of items) {
-              item.image = uiAssets.wheels[signal.id];
-              item.name = signal.label;
+              if (item.id.includes('/wheel-selection/')) item.image = uiAssets.wheelSelections[signal.id];
+              if (item.id.includes('/wheel-center/')) item.image = uiAssets.wheelCenters[signal.id];
+              if (item.id.includes('/wheel-selection/') || item.id.includes('/wheel-center/')) item.name = signal.label;
             }
           });
         }

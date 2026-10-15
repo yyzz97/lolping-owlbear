@@ -21,7 +21,11 @@ const assetFiles = [
 ];
 for (const asset of assetFiles) await access(path.join(root, 'public/assets', asset));
 const uiAssets = uiAssetsFor(new URL('../public/', import.meta.url));
-for (const image of [...Object.values(uiAssets.wheels), ...Object.values(uiAssets.pings)]) {
+for (const image of [
+  uiAssets.wheelBase, uiAssets.wheelSelectionNone,
+  ...Object.values(uiAssets.wheels), ...Object.values(uiAssets.wheelSelections),
+  ...Object.values(uiAssets.wheelCenters), ...Object.values(uiAssets.pings),
+]) {
   await access(fileURLToPath(image.url));
 }
 for (const field of ['icon', 'background_url']) {

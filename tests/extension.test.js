@@ -186,24 +186,31 @@ test('removes the tool and reports an error when mode registration fails', async
   assert.ok(fake.notifications.some(({ message, variant }) => message.includes('轮盘模式注册失败') && variant === 'ERROR'));
 });
 
-test('dragging updates one wheel image and broadcasts the original scene point', async t => {
+test('dragging updates overlay images without replacing the static wheel', async t => {
   const fake = await setup(t);
   const mode = fake.modes.values().next().value;
   mode.onToolDown({}, event(120, 240));
   await flush();
-  assert.equal(fake.items.size, 1);
-  const wheel = [...fake.items.values()][0];
-  assert.equal(wheel.image.url, TEST_UI_ASSETS.wheels.caution.url);
+  assert.equal(fake.items.size, 3);
+  const wheel = [...fake.items.values()].find(item => item.id.includes('/wheel-base/'));
+  const selection = [...fake.items.values()].find(item => item.id.includes('/wheel-selection/'));
+  const center = [...fake.items.values()].find(item => item.id.includes('/wheel-center/'));
+  assert.equal(wheel.image.url, TEST_UI_ASSETS.wheelBase.url);
+  assert.equal(selection.image.url, TEST_UI_ASSETS.wheelSelectionNone.url);
+  assert.equal(center.image.url, TEST_UI_ASSETS.wheelCenters.caution.url);
   mode.onToolMove({}, event(300, 240));
   await flush();
-  assert.equal(wheel.name, 'ON MY WAY');
-  assert.equal(wheel.image.url, TEST_UI_ASSETS.wheels.omw.url);
+  assert.equal(selection.name, 'ON MY WAY');
+  assert.equal(selection.image.url, TEST_UI_ASSETS.wheelSelections.omw.url);
+  assert.equal(center.image.url, TEST_UI_ASSETS.wheelCenters.omw.url);
   mode.onToolMove({}, event(120, 60));
   await flush();
-  assert.equal(wheel.name, 'RETREAT');
+  assert.equal(selection.name, 'RETREAT');
+  assert.equal(center.image.url, TEST_UI_ASSETS.wheelCenters.retreat.url);
   mode.onToolMove({}, event(120, 240));
   await flush();
-  assert.equal(wheel.name, 'CAUTION');
+  assert.equal(selection.name, 'CAUTION');
+  assert.equal(center.image.url, TEST_UI_ASSETS.wheelCenters.caution.url);
   mode.onToolUp({}, event(300, 240));
   await flush();
   assert.equal(fake.messages.length, 1);
@@ -299,18 +306,21 @@ test('all wheel states share a single image size, including bait and the full mi
   mode.onToolDown({}, event(200, 200));
   await flush();
   const wheel = [...fake.items.values()][0];
+  const selection = [...fake.items.values()].find(item => item.id.includes('/wheel-selection/'));
+  const center = [...fake.items.values()].find(item => item.id.includes('/wheel-center/'));
   for (const [index, id] of ['retreat', 'bait', 'omw', 'allin', 'assist', 'hold', 'missing', 'push'].entries()) {
     const angle = (-90 + index * 45) * Math.PI / 180;
     mode.onToolMove({}, event(200 + 130 * Math.cos(angle), 200 + 130 * Math.sin(angle)));
     await flush();
-    assert.equal(wheel.image.url, TEST_UI_ASSETS.wheels[id].url);
-    assert.equal(fake.items.size, 1, 'no independently scaled icons or labels');
-    assert.equal(wheel.image.width, 688);
-    assert.deepEqual(wheel.grid.offset, { x: 344, y: 344 });
+    assert.equal(selection.image.url, TEST_UI_ASSETS.wheelSelections[id].url);
+    assert.equal(center.image.url, TEST_UI_ASSETS.wheelCenters[id].url);
+    assert.equal(fake.items.size, 3, 'static wheel and two overlays remain mounted');
+      assert.equal(wheel.image.width, 728);
+    assert.deepEqual(wheel.grid.offset, { x: 364, y: 364 });
   }
   mode.onToolMove({}, event(70, 200));
   await flush();
-  assert.equal(wheel.name, 'ENEMY MISSING');
+  assert.equal([...fake.items.values()].find(item => item.id.includes('/wheel-selection/')).name, 'ENEMY MISSING');
 });
 
 test('remote scene isolation and overlapping pings remain independent', async t => {
@@ -419,7 +429,7 @@ test('fixed billboards and native labels share scene anchors across zoom and gri
     const ping = [...fake.items.values()].find(item => item.id.includes('/ping/'));
     for (const zoom of [0.01, 0.025, 0.05, 0.15, 0.5, 1, 2, 8, 32, 64]) {
       await fake.obr.viewport.setScale(zoom);
-      assert.deepEqual(projectedSize(wheel, dpi, zoom), { width: 344, height: 344 });
+      assert.deepEqual(projectedSize(wheel, dpi, zoom), { width: 364, height: 364 });
       assert.deepEqual(projectedSize(ping, dpi, zoom), { width: 200, height: 128 });
       assert.deepEqual(ping.position, { x: 900, y: 500 });
       assert.deepEqual(ping.grid.offset, { x: 200, y: 100 });
@@ -435,7 +445,7 @@ test('fixed billboards and native labels share scene anchors across zoom and gri
       const release = event(400 + 120 / zoom, 300);
       mode.onToolMove({}, release);
       await flush();
-      assert.equal(wheel.name, 'ON MY WAY', 'selection uses the current scale while the wheel is already open');
+      assert.equal([...fake.items.values()].find(item => item.id.includes('/wheel-selection/')).name, 'ON MY WAY', 'selection uses the current scale while the wheel is already open');
       mode.onToolMove({}, event(400, 300));
       await flush();
     }
