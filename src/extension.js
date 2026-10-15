@@ -74,6 +74,7 @@ export function registerExtension(OBR, { buildBillboard, buildLabel, signalAsset
   let blockedUntil = 0;
   let globalInputBound = false;
   let restoreTool = null;
+  let autoActivating = false;
   const unsubscribers = [];
 
   function deleteIds(ids) {
@@ -108,8 +109,11 @@ export function registerExtension(OBR, { buildBillboard, buildLabel, signalAsset
       const activeMode = typeof OBR.tool.getActiveToolMode === 'function'
         ? await OBR.tool.getActiveToolMode() : undefined;
       restoreTool = { toolId: activeTool, modeId: activeMode };
+      autoActivating = true;
       await OBR.tool.activateTool(TOOL_ID);
+      autoActivating = false;
     } catch {
+      autoActivating = false;
       restoreTool = null;
     }
   }
@@ -415,6 +419,7 @@ export function registerExtension(OBR, { buildBillboard, buildLabel, signalAsset
         },
         onDeactivate: cancelWheel,
         onActivate: () => {
+          if (autoActivating) return;
           void OBR.notification.show('按住 G 和鼠标左键打开轮盘，移动到方向后松开左键发送；松开 G 或按 Esc 取消。', 'INFO').catch(() => {});
         },
       });
