@@ -1,4 +1,4 @@
-import OBR, { buildImage, buildLabel, buildPath } from '@owlbear-rodeo/sdk';
+import OBR, { buildBillboard, buildLabel, buildPath } from '@owlbear-rodeo/sdk';
 import { registerExtension } from './extension.js';
 
 const wheelIcon = new URL('./wheel.svg', document.baseURI).href;
@@ -21,4 +21,4 @@ const signalAssets = Object.freeze({
   caution: asset('Caution_ping'),
 });
 
-registerExtension(OBR, { buildImage, buildLabel, buildPath, signalAssets, wheelIcon });
+registerExtension(OBR, { buildBillboard, buildLabel, buildPath, signalAssets, wheelIcon });

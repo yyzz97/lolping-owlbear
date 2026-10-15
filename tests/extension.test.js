@@ -4,6 +4,17 @@ import { registerExtension, CHANNEL, DISPLAY_MS, EXTENSION_ID } from '../src/ext
 import { WHEEL } from '../src/geometry.js';
 
 const TEST_WHEEL_ICON = 'https://static.example.test/wheel.svg';
+const TEST_SIGNAL_ASSETS = Object.fromEntries([
+  ['retreat', { width: 256, height: 256, imageUrl: 'https://static.example.test/Retreat_ping.png' }],
+  ['bait', { width: 128, height: 128, imageUrl: 'https://static.example.test/Bait_ping.png' }],
+  ['omw', { width: 256, height: 256, imageUrl: 'https://static.example.test/On_My_Way_ping.png' }],
+  ['allin', { width: 256, height: 256, imageUrl: 'https://static.example.test/All_In_ping.png' }],
+  ['assist', { width: 256, height: 256, imageUrl: 'https://static.example.test/Assist_Me_ping.png' }],
+  ['hold', { width: 256, height: 256, imageUrl: 'https://static.example.test/Hold_ping.png' }],
+  ['missing', { width: 256, height: 256, imageUrl: 'https://static.example.test/Enemy_Missing_ping.png' }],
+  ['push', { width: 256, height: 256, imageUrl: 'https://static.example.test/Push_ping.png' }],
+  ['caution', { width: 256, height: 256, imageUrl: 'https://static.example.test/Caution_ping.png' }],
+]);
 
 function builder(type) {
   return () => {
@@ -31,9 +42,9 @@ function builder(type) {
   };
 }
 
-function imageBuilder() {
+function billboardBuilder() {
   return ({ width, height, mime, url }) => {
-    const item = { id: crypto.randomUUID(), type: 'IMAGE', image: { width, height, mime, url }, grid: { offset: { x: 0, y: 0 }, dpi: 1 } };
+    const item = { id: crypto.randomUUID(), type: 'BILLBOARD', image: { width, height, mime, url }, grid: { offset: { x: 0, y: 0 }, dpi: 1 } };
     const proxy = new Proxy({}, {
       get(_target, method) {
         if (method === 'build') return () => structuredClone(item);
@@ -135,10 +146,11 @@ const flush = async () => {
 };
 const event = (x, y) => ({ pointerPosition: { x, y } });
 
-async function setup(t, scale) {
+async function setup(t, scale, withAssets = false) {
   const fake = makeOwlbear(scale);
   const cleanup = registerExtension(fake.obr, {
     buildPath: builder('PATH'), buildLabel: builder('LABEL'), wheelIcon: TEST_WHEEL_ICON,
+    ...(withAssets ? { buildBillboard: billboardBuilder(), signalAssets: TEST_SIGNAL_ASSETS } : {}),
   });
   t.after(cleanup);
   await fake.onReady();
@@ -216,7 +228,7 @@ test('dragging from the scene point selects and broadcasts a scene-anchored sign
   const marker = [...fake.items.values()].find(item => item.type === 'LABEL');
   assert.match(marker.text.plainText, /正在路上/);
   assert.match(marker.text.plainText, /Alice/);
-  assert.equal(fake.items.size, 4, 'wheel is removed and the temporary local ping remains');
+  assert.equal(fake.items.size, 3, 'wheel is removed and the temporary local ping remains');
   assert.equal([...fake.items.values()].filter(item => item.id.includes('/ping-glyph/')).length, 1);
 });
 
@@ -252,7 +264,7 @@ test('remote messages render only in the matching scene and overlapping pings co
   fake.messageHandler({ data: message, connectionId: 'bob-connection' });
   fake.messageHandler({ data: { ...message, eventId: 'remote-2', signalId: 'bait' }, connectionId: 'bob-connection' });
   await flush();
-  assert.equal(fake.items.size, 8);
+  assert.equal(fake.items.size, 6);
   const labels = [...fake.items.values()].filter(item => item.type === 'LABEL');
   assert.equal(labels.length, 2);
   assert.ok(labels.every(item => item.text.plainText.includes('Bob')));
@@ -284,7 +296,7 @@ test('temporary pings are scheduled for the selected duration', async t => {
   });
   await flush();
   assert.equal(DISPLAY_MS, 3000);
-  assert.equal(fake.items.size, 4);
+  assert.equal(fake.items.size, 3);
 });
 
 test('players still share scene identity when scene metadata is read-only', async t => {
@@ -317,7 +329,7 @@ test('players still share scene identity when scene metadata is read-only', asyn
 
 test('wheel geometry, icon offsets, and pings keep a fixed screen size at different zoom levels', async t => {
   for (const scale of [0.5, 2]) {
-    const fake = await setup(t, scale);
+    const fake = await setup(t, scale, true);
     const key = fake.metadata[EXTENSION_ID].sceneKey;
     fake.messageHandler({
       data: { v: 1, type: 'ping', eventId: `zoom-${String(scale).replace('.', '-')}`, userId: 'bob', sceneKey: key, signalId: 'danger', x: 0, y: 0 },
@@ -332,15 +344,15 @@ test('wheel geometry, icon offsets, and pings keep a fixed screen size at differ
     assert.equal(pingLabel.scale.y * scale, 1);
     assert.equal(ring.scale.x * scale, 1);
     assert.equal(ring.scale.y * scale, 1);
-    assert.equal(pingIcon.scale.x * scale * WHEEL.iconSize, 34);
-    assert.equal((pingLabel.position.y - 45 / scale) * scale, 0);
+    assert.equal(pingIcon.scale.x * pingIcon.image.width, 48);
+    assert.equal((pingLabel.position.y - 52 / scale) * scale, 0);
 
     const mode = fake.modes.values().next().value;
     mode.onToolDown({}, event(0, 0));
     await flush();
     const wheelIcons = [...fake.items.values()].filter(item => item.id.includes('/wheel-glyph/'));
     assert.equal(wheelIcons.length, 8);
-    for (const item of wheelIcons) assert.equal(item.scale.x * scale * WHEEL.iconSize, WHEEL.iconSize);
+    for (const item of wheelIcons) assert.equal(item.scale.x * item.image.width, WHEEL.iconSize);
     const center = [...fake.items.values()].find(item => item.id.includes('/center-label/'));
     assert.equal(center.scale.x * scale, 1);
     assert.equal(WHEEL.innerRadius, 102);
@@ -367,19 +379,9 @@ test('the same screen-space drag selects the same direction at zoomed and reduce
 
 test('uses supplied PNG assets for the wheel, selected center, and map marker', async t => {
   const fake = makeOwlbear(2);
-  const signalAssets = Object.fromEntries([
-    ['retreat', { width: 256, height: 256, imageUrl: 'https://static.example.test/Retreat_ping.png' }],
-    ['bait', { width: 128, height: 128, imageUrl: 'https://static.example.test/Bait_ping.png' }],
-    ['omw', { width: 256, height: 256, imageUrl: 'https://static.example.test/On_My_Way_ping.png' }],
-    ['allin', { width: 256, height: 256, imageUrl: 'https://static.example.test/All_In_ping.png' }],
-    ['assist', { width: 256, height: 256, imageUrl: 'https://static.example.test/Assist_Me_ping.png' }],
-    ['hold', { width: 256, height: 256, imageUrl: 'https://static.example.test/Hold_ping.png' }],
-    ['missing', { width: 256, height: 256, imageUrl: 'https://static.example.test/Enemy_Missing_ping.png' }],
-    ['push', { width: 256, height: 256, imageUrl: 'https://static.example.test/Push_ping.png' }],
-    ['caution', { width: 256, height: 256, imageUrl: 'https://static.example.test/Caution_ping.png' }],
-  ]);
+  const signalAssets = TEST_SIGNAL_ASSETS;
   const cleanup = registerExtension(fake.obr, {
-    buildImage: imageBuilder(), buildPath: builder('PATH'), buildLabel: builder('LABEL'), signalAssets, wheelIcon: TEST_WHEEL_ICON,
+    buildBillboard: billboardBuilder(), buildPath: builder('PATH'), buildLabel: builder('LABEL'), signalAssets, wheelIcon: TEST_WHEEL_ICON,
   });
   t.after(cleanup);
   await fake.onReady();
@@ -387,14 +389,15 @@ test('uses supplied PNG assets for the wheel, selected center, and map marker', 
   const mode = fake.modes.values().next().value;
   mode.onToolDown({}, event(100, 100));
   await flush();
-  const wheelImages = [...fake.items.values()].filter(item => item.type === 'IMAGE');
+  const wheelImages = [...fake.items.values()].filter(item => item.type === 'BILLBOARD');
   assert.equal(wheelImages.length, 9);
   assert.ok(wheelImages.every(item => item.image.url.endsWith('.png')));
+  assert.ok(wheelImages.slice(0, 8).every(item => item.scale.x * item.image.width === WHEEL.iconSize));
   mode.onToolMove({}, event(100, 400));
   await flush();
   const center = [...fake.items.values()].find(item => item.id.includes('/center-glyph/'));
   assert.equal(center.image.url, signalAssets.assist.imageUrl);
-  assert.equal(center.scale.x * 2 * signalAssets.assist.width, 36);
+  assert.equal(center.scale.x * signalAssets.assist.width, 36);
   mode.onToolUp({}, event(100, 400));
   await flush();
   const marker = [...fake.items.values()].find(item => item.id.includes('/ping-glyph/'));

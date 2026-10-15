@@ -50,6 +50,16 @@ function circleAt(commands, x, y, radius, segments = 12) {
   commands.push([5]);
 }
 
+function ellipseCommands(radiusX, radiusY, segments = 48) {
+  const commands = [[0, radiusX, 0]];
+  for (let index = 1; index < segments; index++) {
+    const angle = index * Math.PI * 2 / segments;
+    commands.push([1, radiusX * Math.cos(angle), radiusY * Math.sin(angle)]);
+  }
+  commands.push([5]);
+  return commands;
+}
+
 function signalIcon(signalId) {
   const commands = [];
   switch (signalId) {
@@ -96,19 +106,19 @@ function signalIcon(signalId) {
   return commands;
 }
 
-function makeSignalIcon({ signalId, point, scale, buildPath, buildImage, signalAssets, size = WHEEL.iconSize, color, itemType = 'glyph' }) {
+function makeSignalIcon({ signalId, point, scale, buildPath, buildBillboard, signalAssets, size = WHEEL.iconSize, color, itemType = 'glyph' }) {
   const tint = color ?? signalById(signalId)?.color ?? DEFAULT_SIGNAL.color;
   const inverseScale = 1 / Math.max(scale, 0.05);
   const iconScale = inverseScale * size / WHEEL.iconSize;
   const asset = signalAssets?.[signalId];
-  if (buildImage && asset?.imageUrl) {
-    return buildImage(
+  if (buildBillboard && asset?.imageUrl) {
+    return buildBillboard(
       { width: asset.width, height: asset.height, mime: 'image/png', url: asset.imageUrl },
       { offset: { x: 0, y: 0 }, dpi: 1 },
     )
       .id(`${EXTENSION_ID}/${itemType}/${crypto.randomUUID()}`)
       .position(point)
-      .scale({ x: inverseScale * size / asset.width, y: inverseScale * size / asset.height })
+      .scale({ x: size / asset.width, y: size / asset.height })
       .layer('POPOVER')
       .disableHit(true)
       .disableAutoZIndex(true)
@@ -130,7 +140,7 @@ function makeSignalIcon({ signalId, point, scale, buildPath, buildImage, signalA
     .build();
 }
 
-function makeWheelItems({ point, scale, buildPath, buildImage, signalAssets, buildLabel }) {
+function makeWheelItems({ point, scale, buildPath, buildBillboard, signalAssets, buildLabel }) {
   const inverseScale = 1 / Math.max(scale, 0.05);
   const items = [];
   const wedgeIds = [];
@@ -155,7 +165,7 @@ function makeWheelItems({ point, scale, buildPath, buildImage, signalAssets, bui
       x: point.x + Math.cos(angle) * WHEEL.iconRadius * inverseScale,
       y: point.y + Math.sin(angle) * WHEEL.iconRadius * inverseScale,
     };
-    items.push(makeSignalIcon({ signalId: signal.id, point: iconPoint, scale, buildPath, buildImage, signalAssets, itemType: 'wheel-glyph' }));
+    items.push(makeSignalIcon({ signalId: signal.id, point: iconPoint, scale, buildPath, buildBillboard, signalAssets, itemType: 'wheel-glyph' }));
   });
 
   items.push(buildPath()
@@ -187,7 +197,7 @@ function makeWheelItems({ point, scale, buildPath, buildImage, signalAssets, bui
     .disableAutoZIndex(true)
     .build());
 
-  const centerIcon = makeSignalIcon({ signalId: DEFAULT_SIGNAL.id, point: { x: point.x, y: point.y - 48 * inverseScale }, scale, buildPath, buildImage, signalAssets, size: 36, itemType: 'center-glyph' });
+  const centerIcon = makeSignalIcon({ signalId: DEFAULT_SIGNAL.id, point: { x: point.x, y: point.y - 48 * inverseScale }, scale, buildPath, buildBillboard, signalAssets, size: 36, itemType: 'center-glyph' });
   items.push(centerIcon);
   const centerLabelId = `${EXTENSION_ID}/center-label/${crypto.randomUUID()}`;
   items.push(buildLabel()
@@ -227,11 +237,11 @@ function makeWheelItems({ point, scale, buildPath, buildImage, signalAssets, bui
   return { items, wedgeIds, centerIconId: centerIcon.id, centerLabelId };
 }
 
-function makePingItems({ point, scale, signal, sender, buildPath, buildImage, signalAssets, buildLabel }) {
+function makePingItems({ point, scale, signal, sender, buildPath, buildBillboard, signalAssets, buildLabel }) {
   const inverseScale = 1 / Math.max(scale, 0.05);
   const ring = buildPath()
     .id(`${EXTENSION_ID}/ring/${crypto.randomUUID()}`)
-    .commands(circleCommands(28))
+    .commands(ellipseCommands(36, 23))
     .position(point)
     .scale({ x: inverseScale, y: inverseScale })
     .fillOpacity(0)
@@ -245,37 +255,33 @@ function makePingItems({ point, scale, signal, sender, buildPath, buildImage, si
     .id(`${EXTENSION_ID}/ping/${crypto.randomUUID()}`)
     .plainText(`${signal.name} · ${sender}`)
     .fontFamily('Noto Sans, sans-serif')
-    .fontSize(16)
+    .fontSize(13)
     .fontWeight(700)
     .fillColor('#fff7e8')
-    .width(192)
-    .height(34)
+    .width(176)
+    .height(28)
     .backgroundColor('#172126')
     .backgroundOpacity(0.9)
     .cornerRadius(8)
-    .position({ x: point.x, y: point.y + 45 * inverseScale })
+    .position({ x: point.x, y: point.y + 52 * inverseScale })
     .scale({ x: inverseScale, y: inverseScale })
     .layer('POPOVER')
     .disableHit(true)
     .build();
-  const disk = buildPath()
-    .id(`${EXTENSION_ID}/marker/${crypto.randomUUID()}`)
-    .commands(circleCommands(21))
-    .position(point)
-    .scale({ x: inverseScale, y: inverseScale })
-    .fillColor('#10191d')
-    .fillOpacity(0.96)
-    .strokeColor(signal.color)
-    .strokeOpacity(0.82)
-    .strokeWidth(1.2)
-    .layer('POPOVER')
-    .disableHit(true)
-    .build();
-  const icon = makeSignalIcon({ signalId: signal.id, point, scale, buildPath, buildImage, signalAssets, size: 34, itemType: 'ping-glyph' });
-  return [ring, disk, icon, label];
+  const icon = makeSignalIcon({
+    signalId: signal.id,
+    point: { x: point.x, y: point.y - 25 * inverseScale },
+    scale,
+    buildPath,
+    buildBillboard,
+    signalAssets,
+    size: 48,
+    itemType: 'ping-glyph',
+  });
+  return [ring, icon, label];
 }
 
-export function registerExtension(OBR, { buildImage, buildPath, buildLabel, signalAssets, wheelIcon }) {
+export function registerExtension(OBR, { buildBillboard, buildPath, buildLabel, signalAssets, wheelIcon }) {
   let sceneKey = null;
   let sceneGeneration = 0;
   let gesture = null;
@@ -309,7 +315,7 @@ export function registerExtension(OBR, { buildImage, buildPath, buildLabel, sign
     const key = sceneKey;
     const scale = await OBR.viewport.getScale().catch(() => 1);
     if (!ready || key !== sceneKey) return false;
-    const items = makePingItems({ point: { x: message.x, y: message.y }, scale, signal, sender, buildPath, buildImage, signalAssets, buildLabel });
+    const items = makePingItems({ point: { x: message.x, y: message.y }, scale, signal, sender, buildPath, buildBillboard, signalAssets, buildLabel });
     const ids = items.map(item => item.id);
     const token = Symbol('ping');
     const entry = { ids, timer: null };
@@ -345,7 +351,7 @@ export function registerExtension(OBR, { buildImage, buildPath, buildLabel, sign
     const point = { x: event.pointerPosition.x, y: event.pointerPosition.y };
     const scale = await OBR.viewport.getScale().catch(() => 1);
     if (!ready || gesture) return;
-    const { items, wedgeIds, centerIconId, centerLabelId } = makeWheelItems({ point, scale, buildPath, buildImage, signalAssets, buildLabel });
+    const { items, wedgeIds, centerIconId, centerLabelId } = makeWheelItems({ point, scale, buildPath, buildBillboard, signalAssets, buildLabel });
     const current = {
       point, scale, sceneKey, wedgeIds, centerIconId, centerLabelId, itemIds: items.map(item => item.id), hot: -1,
       ready: false, tail: Promise.resolve(), pendingPosition: null, pendingFinish: null,
@@ -390,11 +396,11 @@ export function registerExtension(OBR, { buildImage, buildPath, buildLabel, sign
             item.commands = signalIcon(signal.id);
             item.style.strokeColor = signal.color;
             item.style.fillColor = signal.color;
-          } else if (item.type === 'IMAGE' && signalAssets?.[signal.id]?.imageUrl) {
+          } else if (item.type === 'BILLBOARD' && signalAssets?.[signal.id]?.imageUrl) {
             const asset = signalAssets[signal.id];
             item.image = { width: asset.width, height: asset.height, mime: 'image/png', url: asset.imageUrl };
             const centerSize = 36;
-            item.scale = { x: 1 / Math.max(current.scale, 0.05) * centerSize / asset.width, y: 1 / Math.max(current.scale, 0.05) * centerSize / asset.height };
+            item.scale = { x: centerSize / asset.width, y: centerSize / asset.height };
           } else {
             item.text.plainText = signal.label;
             item.text.style.fillColor = signal.color;
