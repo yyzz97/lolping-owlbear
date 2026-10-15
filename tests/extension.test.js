@@ -18,20 +18,22 @@ const TEST_SIGNAL_ASSETS = Object.fromEntries([
 
 function builder(type) {
   return () => {
-    const item = { id: crypto.randomUUID(), type, style: {} };
+    const item = { id: crypto.randomUUID(), type, style: {}, textStyle: {} };
     const styleFields = new Set([
       'fillColor', 'fillOpacity', 'strokeColor', 'strokeOpacity', 'strokeWidth',
       'backgroundOpacity', 'backgroundColor', 'cornerRadius',
+      'fontFamily', 'fontSize', 'fontWeight',
     ]);
     const proxy = new Proxy({}, {
       get(_target, method) {
         if (method === 'build') return () => structuredClone({
           ...item,
-          ...(type === 'LABEL' ? { text: { plainText: item.plainText ?? '', richText: [], style: {}, type: 'PLAIN' } } : {}),
+          ...(type === 'LABEL' ? { text: { plainText: item.plainText ?? '', richText: [], style: structuredClone(item.textStyle), type: 'PLAIN' } } : {}),
         });
         return (...args) => {
           const key = String(method);
           if (key === 'plainText') item.plainText = args[0];
+          else if (styleFields.has(key) && type === 'LABEL' && ['fontFamily', 'fontSize', 'fontWeight', 'fillColor', 'fillOpacity', 'strokeColor', 'strokeOpacity', 'strokeWidth'].includes(key)) item.textStyle[key] = args[0];
           else if (styleFields.has(key)) item.style[key] = args[0];
           else item[key] = args[0];
           return proxy;
@@ -327,8 +329,8 @@ test('players still share scene identity when scene metadata is read-only', asyn
   assert.match(marker.text.plainText, /正在路上/);
 });
 
-test('wheel geometry, icon offsets, and pings keep a fixed screen size at different zoom levels', async t => {
-  for (const scale of [0.5, 2]) {
+test('wheel geometry and icons compensate zoom while labels retain their native text size', async t => {
+  for (const scale of [0.05, 0.15, 0.5, 2]) {
     const fake = await setup(t, scale, true);
     const key = fake.metadata[EXTENSION_ID].sceneKey;
     fake.messageHandler({
@@ -340,8 +342,8 @@ test('wheel geometry, icon offsets, and pings keep a fixed screen size at differ
     const pingLabel = [...fake.items.values()].find(item => item.id.includes('/ping/'));
     const ring = [...fake.items.values()].find(item => item.id.includes('/ring/'));
     const pingIcon = [...fake.items.values()].find(item => item.id.includes('/ping-glyph/'));
-    assert.equal(pingLabel.scale.x * scale, 1);
-    assert.equal(pingLabel.scale.y * scale, 1);
+    assert.deepEqual(pingLabel.scale, { x: 1, y: 1 });
+    assert.equal(pingLabel.text.style.fontSize, 13);
     assert.equal(ring.scale.x * scale, 1);
     assert.equal(ring.scale.y * scale, 1);
     assert.equal(pingIcon.scale.x * pingIcon.image.width / pingIcon.grid.dpi * 96, 48);
@@ -354,7 +356,11 @@ test('wheel geometry, icon offsets, and pings keep a fixed screen size at differ
     assert.equal(wheelIcons.length, 8);
     for (const item of wheelIcons) assert.equal(item.scale.x * item.image.width / item.grid.dpi * 96, WHEEL.iconSize);
     const center = [...fake.items.values()].find(item => item.id.includes('/center-label/'));
-    assert.equal(center.scale.x * scale, 1);
+    const back = [...fake.items.values()].find(item => item.id.includes('/back/'));
+    assert.deepEqual(center.scale, { x: 1, y: 1 });
+    assert.deepEqual(back.scale, { x: 1, y: 1 });
+    assert.equal(center.text.style.fontSize, 19);
+    assert.equal(back.text.style.fontSize, 14);
     assert.equal(WHEEL.innerRadius, 102);
     assert.equal(WHEEL.outerRadius, 170);
   }
