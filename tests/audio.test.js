@@ -55,3 +55,22 @@ test('audio unlock resumes a context and plays a short signal-specific ping loca
   assert.ok(Math.abs(oscillators[0].stoppedAt - 5.125) < 1e-9);
   assert.ok(Math.abs(oscillators[1].stoppedAt - 5.205) < 1e-9);
 });
+
+test('plays a supplied OGG cue when the browser Audio API is available', async t => {
+  const previousAudio = globalThis.Audio;
+  const played = [];
+  globalThis.Audio = class AudioMock {
+    constructor(url) { this.url = url; played.push(this); }
+    play() { this.started = true; return Promise.resolve(); }
+  };
+  t.after(() => {
+    if (previousAudio === undefined) delete globalThis.Audio;
+    else globalThis.Audio = previousAudio;
+  });
+
+  const { playPing } = await import('../src/audio.js');
+  const audio = playPing('bait', '/assets/Bait_ping_SFX.ogg');
+  assert.equal(audio.url, '/assets/Bait_ping_SFX.ogg');
+  assert.equal(audio.started, true);
+  assert.equal(played.length, 1);
+});

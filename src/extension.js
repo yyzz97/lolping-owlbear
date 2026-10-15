@@ -96,10 +96,24 @@ function signalIcon(signalId) {
   return commands;
 }
 
-function makeSignalIcon({ signalId, point, scale, buildPath, size = WHEEL.iconSize, color, itemType = 'glyph' }) {
+function makeSignalIcon({ signalId, point, scale, buildPath, buildImage, signalAssets, size = WHEEL.iconSize, color, itemType = 'glyph' }) {
   const tint = color ?? signalById(signalId)?.color ?? DEFAULT_SIGNAL.color;
   const inverseScale = 1 / Math.max(scale, 0.05);
   const iconScale = inverseScale * size / WHEEL.iconSize;
+  const asset = signalAssets?.[signalId];
+  if (buildImage && asset?.imageUrl) {
+    return buildImage(
+      { width: asset.width, height: asset.height, mime: 'image/png', url: asset.imageUrl },
+      { offset: { x: 0, y: 0 }, dpi: 1 },
+    )
+      .id(`${EXTENSION_ID}/${itemType}/${crypto.randomUUID()}`)
+      .position(point)
+      .scale({ x: inverseScale * size / asset.width, y: inverseScale * size / asset.height })
+      .layer('POPOVER')
+      .disableHit(true)
+      .disableAutoZIndex(true)
+      .build();
+  }
   return buildPath()
     .id(`${EXTENSION_ID}/${itemType}/${crypto.randomUUID()}`)
     .commands(signalIcon(signalId))
@@ -116,7 +130,7 @@ function makeSignalIcon({ signalId, point, scale, buildPath, size = WHEEL.iconSi
     .build();
 }
 
-function makeWheelItems({ point, scale, buildPath, buildLabel }) {
+function makeWheelItems({ point, scale, buildPath, buildImage, signalAssets, buildLabel }) {
   const inverseScale = 1 / Math.max(scale, 0.05);
   const items = [];
   const wedgeIds = [];
@@ -141,7 +155,7 @@ function makeWheelItems({ point, scale, buildPath, buildLabel }) {
       x: point.x + Math.cos(angle) * WHEEL.iconRadius * inverseScale,
       y: point.y + Math.sin(angle) * WHEEL.iconRadius * inverseScale,
     };
-    items.push(makeSignalIcon({ signalId: signal.id, point: iconPoint, scale, buildPath, itemType: 'wheel-glyph' }));
+    items.push(makeSignalIcon({ signalId: signal.id, point: iconPoint, scale, buildPath, buildImage, signalAssets, itemType: 'wheel-glyph' }));
   });
 
   items.push(buildPath()
@@ -173,7 +187,7 @@ function makeWheelItems({ point, scale, buildPath, buildLabel }) {
     .disableAutoZIndex(true)
     .build());
 
-  const centerIcon = makeSignalIcon({ signalId: DEFAULT_SIGNAL.id, point: { x: point.x, y: point.y - 48 * inverseScale }, scale, buildPath, size: 36, itemType: 'center-glyph' });
+  const centerIcon = makeSignalIcon({ signalId: DEFAULT_SIGNAL.id, point: { x: point.x, y: point.y - 48 * inverseScale }, scale, buildPath, buildImage, signalAssets, size: 36, itemType: 'center-glyph' });
   items.push(centerIcon);
   const centerLabelId = `${EXTENSION_ID}/center-label/${crypto.randomUUID()}`;
   items.push(buildLabel()
@@ -213,7 +227,7 @@ function makeWheelItems({ point, scale, buildPath, buildLabel }) {
   return { items, wedgeIds, centerIconId: centerIcon.id, centerLabelId };
 }
 
-function makePingItems({ point, scale, signal, sender, buildPath, buildLabel }) {
+function makePingItems({ point, scale, signal, sender, buildPath, buildImage, signalAssets, buildLabel }) {
   const inverseScale = 1 / Math.max(scale, 0.05);
   const ring = buildPath()
     .id(`${EXTENSION_ID}/ring/${crypto.randomUUID()}`)
@@ -257,11 +271,11 @@ function makePingItems({ point, scale, signal, sender, buildPath, buildLabel }) 
     .layer('POPOVER')
     .disableHit(true)
     .build();
-  const icon = makeSignalIcon({ signalId: signal.id, point, scale, buildPath, size: 34, itemType: 'ping-glyph' });
+  const icon = makeSignalIcon({ signalId: signal.id, point, scale, buildPath, buildImage, signalAssets, size: 34, itemType: 'ping-glyph' });
   return [ring, disk, icon, label];
 }
 
-export function registerExtension(OBR, { buildPath, buildLabel, wheelIcon }) {
+export function registerExtension(OBR, { buildImage, buildPath, buildLabel, signalAssets, wheelIcon }) {
   let sceneKey = null;
   let sceneGeneration = 0;
   let gesture = null;
@@ -295,7 +309,7 @@ export function registerExtension(OBR, { buildPath, buildLabel, wheelIcon }) {
     const key = sceneKey;
     const scale = await OBR.viewport.getScale().catch(() => 1);
     if (!ready || key !== sceneKey) return false;
-    const items = makePingItems({ point: { x: message.x, y: message.y }, scale, signal, sender, buildPath, buildLabel });
+    const items = makePingItems({ point: { x: message.x, y: message.y }, scale, signal, sender, buildPath, buildImage, signalAssets, buildLabel });
     const ids = items.map(item => item.id);
     const token = Symbol('ping');
     const entry = { ids, timer: null };
@@ -312,7 +326,7 @@ export function registerExtension(OBR, { buildPath, buildLabel, wheelIcon }) {
       }, DISPLAY_MS);
     }).catch(() => localPings.delete(token));
     await unlockAudio();
-    playPing(signal.id);
+    playPing(signal.id, signalAssets?.[signal.id]?.audioUrl);
     return true;
   }
 
@@ -331,7 +345,7 @@ export function registerExtension(OBR, { buildPath, buildLabel, wheelIcon }) {
     const point = { x: event.pointerPosition.x, y: event.pointerPosition.y };
     const scale = await OBR.viewport.getScale().catch(() => 1);
     if (!ready || gesture) return;
-    const { items, wedgeIds, centerIconId, centerLabelId } = makeWheelItems({ point, scale, buildPath, buildLabel });
+    const { items, wedgeIds, centerIconId, centerLabelId } = makeWheelItems({ point, scale, buildPath, buildImage, signalAssets, buildLabel });
     const current = {
       point, scale, sceneKey, wedgeIds, centerIconId, centerLabelId, itemIds: items.map(item => item.id), hot: -1,
       ready: false, tail: Promise.resolve(), pendingPosition: null, pendingFinish: null,
@@ -376,6 +390,11 @@ export function registerExtension(OBR, { buildPath, buildLabel, wheelIcon }) {
             item.commands = signalIcon(signal.id);
             item.style.strokeColor = signal.color;
             item.style.fillColor = signal.color;
+          } else if (item.type === 'IMAGE' && signalAssets?.[signal.id]?.imageUrl) {
+            const asset = signalAssets[signal.id];
+            item.image = { width: asset.width, height: asset.height, mime: 'image/png', url: asset.imageUrl };
+            const centerSize = 36;
+            item.scale = { x: 1 / Math.max(current.scale, 0.05) * centerSize / asset.width, y: 1 / Math.max(current.scale, 0.05) * centerSize / asset.height };
           } else {
             item.text.plainText = signal.label;
             item.text.style.fillColor = signal.color;

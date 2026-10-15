@@ -10,7 +10,7 @@ This is a standalone Owlbear Rodeo 2 extension built with `@owlbear-rodeo/sdk`. 
 4. On the map, hold the left mouse button to open the wheel, drag toward one of eight signals, then release to send it. The center shows the selected signal; release near the center or press **Esc** to cancel.
 5. Everyone in the same room with the extension enabled sees the same scene-point ping, the sender name, and the signal name. Signals stack when they overlap and fade after three seconds.
 
-The wheel uses a compact dark center disc, thin gold radial guides, colored signal glyphs, and a live center preview. It opens at the pointer's initial map position and keeps a consistent screen size at different zoom levels. The signal is anchored to the point where the gesture began. Sound is generated locally with Web Audio; no sound CDN is used.
+The wheel uses a compact dark center disc, thin gold radial guides, and the supplied signal PNGs for the wheel, center preview, and map marker. It opens at the pointer's initial map position and keeps a consistent screen size at different zoom levels. The signal is anchored to the point where the gesture began. The supplied OGG cues are played locally; Web Audio remains a fallback when a browser blocks or cannot load a cue. Bait uses the supplied `Bait_ping_SFX.ogg`.
 
 ## Develop
 
@@ -36,5 +36,5 @@ The unit tests use a mock Owlbear API. They do not replace this live, two-client
 
 - Room messages are ephemeral and are not saved as permanent scene items.
 - Scene identity is stored in this extension's scene metadata so signals from one scene are ignored in another. If scene metadata cannot be written, the extension hashes the shared scene item IDs as a fallback.
-- The Owlbear implementation uses custom-drawn vector signal glyphs and generated tones; it does not redistribute Riot Games image or audio assets.
+- The Owlbear implementation includes the user-provided modified PNG and OGG assets in `public/assets/`; these are separate from the original FVTT reference project and are used only by this player-made extension.
 - Inspired by the signal categories and radial interaction in [DMHPJ/fvtt-lolping](https://github.com/DMHPJ/fvtt-lolping).

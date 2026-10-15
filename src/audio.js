@@ -23,8 +23,26 @@ export async function unlockAudio() {
   }
 }
 
-export function playPing(signalId = 'omw') {
-  if (!context || context.state !== 'running') return;
+export function playPing(signalId = 'omw', audioUrl = null) {
+  if (audioUrl && typeof Audio !== 'undefined') {
+    try {
+      const audio = new Audio(audioUrl);
+      audio.preload = 'auto';
+      audio.volume = 0.72;
+      const playback = audio.play();
+      if (playback && typeof playback.catch === 'function') {
+        playback.catch(() => playSynthPing(signalId));
+      }
+      return audio;
+    } catch {
+      // Fall through to the local synthesized cue.
+    }
+  }
+  return playSynthPing(signalId);
+}
+
+function playSynthPing(signalId = 'omw') {
+  if (!context || context.state !== 'running') return null;
   const now = context.currentTime;
   const notes = PING_NOTES[signalId] ?? PING_NOTES.omw;
   notes.forEach((frequency, index) => {
@@ -43,4 +61,5 @@ export function playPing(signalId = 'omw') {
     oscillator.start(start);
     oscillator.stop(start + duration + 0.01);
   });
+  return context;
 }

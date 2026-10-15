@@ -31,6 +31,25 @@ function builder(type) {
   };
 }
 
+function imageBuilder() {
+  return ({ width, height, mime, url }) => {
+    const item = { id: crypto.randomUUID(), type: 'IMAGE', image: { width, height, mime, url }, grid: { offset: { x: 0, y: 0 }, dpi: 1 } };
+    const proxy = new Proxy({}, {
+      get(_target, method) {
+        if (method === 'build') return () => structuredClone(item);
+        return (...args) => {
+          if (method === 'id') item.id = args[0];
+          else if (method === 'position') item.position = args[0];
+          else if (method === 'scale') item.scale = args[0];
+          else item[method] = args[0];
+          return proxy;
+        };
+      },
+    });
+    return proxy;
+  };
+}
+
 function makeOwlbear(scale = 2, {
   metadataWritable = true,
   toolCreateError = null,
@@ -344,4 +363,40 @@ test('the same screen-space drag selects the same direction at zoomed and reduce
     assert.equal(fake.messages.length, 1);
     assert.equal(fake.messages[0].data.signalId, 'omw');
   }
+});
+
+test('uses supplied PNG assets for the wheel, selected center, and map marker', async t => {
+  const fake = makeOwlbear(2);
+  const signalAssets = Object.fromEntries([
+    ['retreat', { width: 256, height: 256, imageUrl: 'https://static.example.test/Retreat_ping.png' }],
+    ['bait', { width: 128, height: 128, imageUrl: 'https://static.example.test/Bait_ping.png' }],
+    ['omw', { width: 256, height: 256, imageUrl: 'https://static.example.test/On_My_Way_ping.png' }],
+    ['allin', { width: 256, height: 256, imageUrl: 'https://static.example.test/All_In_ping.png' }],
+    ['assist', { width: 256, height: 256, imageUrl: 'https://static.example.test/Assist_Me_ping.png' }],
+    ['hold', { width: 256, height: 256, imageUrl: 'https://static.example.test/Hold_ping.png' }],
+    ['missing', { width: 256, height: 256, imageUrl: 'https://static.example.test/Enemy_Missing_ping.png' }],
+    ['push', { width: 256, height: 256, imageUrl: 'https://static.example.test/Push_ping.png' }],
+    ['caution', { width: 256, height: 256, imageUrl: 'https://static.example.test/Caution_ping.png' }],
+  ]);
+  const cleanup = registerExtension(fake.obr, {
+    buildImage: imageBuilder(), buildPath: builder('PATH'), buildLabel: builder('LABEL'), signalAssets, wheelIcon: TEST_WHEEL_ICON,
+  });
+  t.after(cleanup);
+  await fake.onReady();
+  await flush();
+  const mode = fake.modes.values().next().value;
+  mode.onToolDown({}, event(100, 100));
+  await flush();
+  const wheelImages = [...fake.items.values()].filter(item => item.type === 'IMAGE');
+  assert.equal(wheelImages.length, 9);
+  assert.ok(wheelImages.every(item => item.image.url.endsWith('.png')));
+  mode.onToolMove({}, event(100, 400));
+  await flush();
+  const center = [...fake.items.values()].find(item => item.id.includes('/center-glyph/'));
+  assert.equal(center.image.url, signalAssets.assist.imageUrl);
+  assert.equal(center.scale.x * 2 * signalAssets.assist.width, 36);
+  mode.onToolUp({}, event(100, 400));
+  await flush();
+  const marker = [...fake.items.values()].find(item => item.id.includes('/ping-glyph/'));
+  assert.equal(marker.image.url, signalAssets.assist.imageUrl);
 });
