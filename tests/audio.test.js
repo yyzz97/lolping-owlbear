@@ -44,7 +44,7 @@ test('audio unlock resumes a context and plays a short signal-specific ping loca
   });
 
   await unlockAudio();
-  playPing('danger');
+  playPing('retreat');
 
   assert.equal(oscillators.length, 2);
   assert.equal(oscillators[0].startedAt, 5);

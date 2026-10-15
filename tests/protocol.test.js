@@ -9,7 +9,7 @@ const valid = {
   eventId: 'event-1',
   userId: 'player-1',
   sceneKey: 'scene-1',
-  signalId: 'danger',
+  signalId: 'retreat',
   x: 420,
   y: -60,
 };
@@ -22,6 +22,7 @@ test('a valid message preserves world coordinates and strips sender-provided dis
 test('only the eight supported signal IDs can be sent', () => {
   assert.equal(SIGNALS.length, 8);
   for (const signal of SIGNALS) assert.equal(parsePing({ ...valid, signalId: signal.id })?.signalId, signal.id);
+  assert.equal(parsePing({ ...valid, signalId: 'danger' })?.signalId, 'danger');
   assert.equal(parsePing({ ...valid, signalId: 'custom' }), null);
   assert.equal(parsePing({ ...valid, signalId: '__proto__' }), null);
 });

@@ -1,14 +1,15 @@
 let context;
 
 const PING_NOTES = Object.freeze({
-  danger: [784, 1047],
+  caution: [784, 1047],
+  retreat: [784, 1047],
+  bait: [698, 880],
   push: [587, 880],
   omw: [698, 988],
   allin: [523, 784],
   assist: [659, 988],
-  needvision: [988, 1319],
+  hold: [988, 1319],
   missing: [880, 659],
-  enemyvision: [1047, 784],
 });
 
 export async function unlockAudio() {

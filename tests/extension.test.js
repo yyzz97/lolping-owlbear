@@ -172,9 +172,19 @@ test('dragging from the scene point selects and broadcasts a scene-anchored sign
   assert.equal([...fake.items.values()].filter(item => item.id.includes('/wheel-glyph/')).length, 8);
   mode.onToolMove({}, event(300, 240));
   await flush();
-  const highlighted = [...fake.items.values()].filter(item => item.id.includes('/wheel/') && item.style.fillOpacity === 0.55);
+  const highlighted = [...fake.items.values()].filter(item => item.id.includes('/wheel/') && item.style.fillOpacity === 0.2);
   assert.equal(highlighted.length, 1);
-  assert.equal(highlighted[0].style.fillColor, '#8a8f96');
+  const centerLabel = [...fake.items.values()].find(item => item.id.includes('/center-label/'));
+  assert.equal(centerLabel.text.plainText, 'ON MY WAY');
+  const centerGlyph = [...fake.items.values()].find(item => item.id.includes('/center-glyph/'));
+  assert.equal(centerGlyph.style.strokeColor, '#22b9e9');
+  mode.onToolMove({}, event(120, 60));
+  await flush();
+  assert.equal(centerLabel.text.plainText, 'RETREAT');
+  assert.equal(centerGlyph.style.strokeColor, '#f12c55');
+  mode.onToolMove({}, event(120, 240));
+  await flush();
+  assert.equal(centerLabel.text.plainText, 'CAUTION');
   mode.onToolUp({}, event(300, 240));
   await flush();
   assert.equal(fake.messages.length, 1);
@@ -221,7 +231,7 @@ test('remote messages render only in the matching scene and overlapping pings co
   assert.equal(fake.items.size, 0);
 
   fake.messageHandler({ data: message, connectionId: 'bob-connection' });
-  fake.messageHandler({ data: { ...message, eventId: 'remote-2', signalId: 'push' }, connectionId: 'bob-connection' });
+  fake.messageHandler({ data: { ...message, eventId: 'remote-2', signalId: 'bait' }, connectionId: 'bob-connection' });
   await flush();
   assert.equal(fake.items.size, 8);
   const labels = [...fake.items.values()].filter(item => item.type === 'LABEL');
@@ -312,10 +322,10 @@ test('wheel geometry, icon offsets, and pings keep a fixed screen size at differ
     const wheelIcons = [...fake.items.values()].filter(item => item.id.includes('/wheel-glyph/'));
     assert.equal(wheelIcons.length, 8);
     for (const item of wheelIcons) assert.equal(item.scale.x * scale * WHEEL.iconSize, WHEEL.iconSize);
-    const center = [...fake.items.values()].find(item => item.id.includes('/center/'));
+    const center = [...fake.items.values()].find(item => item.id.includes('/center-label/'));
     assert.equal(center.scale.x * scale, 1);
-    const halo = [...fake.items.values()].find(item => item.id.includes('/halo/') && item.commands?.length > 30);
-    assert.equal(halo.scale.x * scale * WHEEL.haloRadius, WHEEL.haloRadius);
+    assert.equal(WHEEL.innerRadius, 102);
+    assert.equal(WHEEL.outerRadius, 170);
   }
 });
 
