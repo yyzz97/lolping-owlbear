@@ -48,8 +48,6 @@ function makeBillboard(buildBillboard, image, point, width, dpi, itemType, name,
     .name(name)
     .position(point)
     .scale({ x: width / image.width, y: width / image.width })
-    .minViewScale(1)
-    .maxViewScale(1)
     .zIndex(Date.now())
     .layer('POPOVER')
     .disableHit(true)
@@ -57,7 +55,7 @@ function makeBillboard(buildBillboard, image, point, width, dpi, itemType, name,
     .build();
 }
 
-export function registerExtension(OBR, { buildBillboard, signalAssets, wheelIcon, uiAssets, renderPingImage }) {
+export function registerExtension(OBR, { buildBillboard, signalAssets, wheelIcon, uiAssets, renderPingLabel, version = 'dev' }) {
   let sceneKey = null;
   let sceneGeneration = 0;
   let gesture = null;
@@ -90,12 +88,12 @@ export function registerExtension(OBR, { buildBillboard, signalAssets, wheelIcon
     if (!signal || !ready || message.sceneKey !== sceneKey) return false;
     const key = sceneKey;
     const label = `${signal.name} · ${sender}`;
-    const [dpi, image] = await Promise.all([
-      OBR.scene.grid.getDpi(), renderPingImage(uiAssets.pings[signal.id], label),
-    ]);
+    const dpi = await OBR.scene.grid.getDpi();
     if (!ready || key !== sceneKey) return false;
-    const items = [makeBillboard(buildBillboard, image, { x: message.x, y: message.y }, 200, dpi, 'ping', label,
-      { x: image.width / 2, y: 100 })];
+    const image = uiAssets.pings[signal.id];
+    const items = [image, renderPingLabel(image, label)].map(content =>
+      makeBillboard(buildBillboard, content, { x: message.x, y: message.y }, 200, dpi, 'ping', label,
+        { x: image.width / 2, y: 100 }));
     const ids = items.map(item => item.id);
     const token = Symbol('ping');
     const entry = { ids, timer: null };
@@ -273,7 +271,7 @@ export function registerExtension(OBR, { buildBillboard, signalAssets, wheelIcon
       return;
     }
 
-    void OBR.notification.show('lolPing 信号轮盘已加载。', 'SUCCESS').catch(() => {});
+    void OBR.notification.show(`lolPing ${version} 信号轮盘已加载。`, 'SUCCESS').catch(() => {});
 
     try {
       unsubscribers.push(OBR.broadcast.onMessage(CHANNEL, receive));

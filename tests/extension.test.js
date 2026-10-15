@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { registerExtension, CHANNEL, DISPLAY_MS, EXTENSION_ID } from '../src/extension.js';
 import { uiAssetsFor } from '../src/ui-assets.js';
+import { renderPingLabel } from '../src/render-ping.js';
 
 const TEST_WHEEL_ICON = 'https://static.example.test/wheel.svg';
 const TEST_UI_ASSETS = uiAssetsFor('https://static.example.test/');
@@ -86,7 +87,12 @@ function makeOwlbear(scale = 2, {
       onReadyChange(callback) { sceneReadyHandler = callback; return () => { sceneReadyHandler = null; }; },
       items: { async getItems() { return [{ id: 'map-1', layer: 'MAP' }]; } },
       local: {
-        async addItems(values) { for (const item of values) items.set(item.id, structuredClone(item)); },
+        async addItems(values) {
+          for (const item of values) {
+            if (item.image.url.length > 2048) throw new Error('image.url exceeds Owlbear limit');
+            items.set(item.id, structuredClone(item));
+          }
+        },
         async updateItems(filter, update) {
           const selected = (Array.isArray(filter) ? filter : [...items.values()].filter(filter))
             .map(value => typeof value === 'string' ? items.get(value) : items.get(value.id))
@@ -117,7 +123,7 @@ const event = (x, y) => ({ pointerPosition: { x, y } });
 const options = () => ({
   buildBillboard: billboardBuilder(), wheelIcon: TEST_WHEEL_ICON,
   signalAssets: TEST_SIGNAL_ASSETS, uiAssets: TEST_UI_ASSETS,
-  renderPingImage: async (image, label) => ({ ...image, url: `data:image/png;base64,${Buffer.from(label).toString('base64')}` }),
+  renderPingLabel, version: 'test',
 });
 
 async function setup(t, scale = 2, settings = {}) {
@@ -188,10 +194,11 @@ test('dragging updates one wheel image and broadcasts the original scene point',
     { signalId: fake.messages[0].data.signalId, x: fake.messages[0].data.x, y: fake.messages[0].data.y },
     { signalId: 'omw', x: 120, y: 240 },
   );
-  assert.equal(fake.items.size, 1, 'wheel is removed and one complete ping remains');
+  assert.equal(fake.items.size, 2, 'wheel is removed and the PNG plus matching text frame remain');
   const marker = [...fake.items.values()][0];
   assert.equal(marker.name, '正在路上 · Alice');
-  assert.match(marker.image.url, /^data:image\/png;base64,/);
+  assert.equal(marker.image.url, TEST_UI_ASSETS.pings.omw.url);
+  assert.match([...fake.items.values()][1].image.url, /^data:image\/svg\+xml,/);
 });
 
 test('center release sends caution with its audio and Escape cancels', async t => {
@@ -220,7 +227,7 @@ test('center release sends caution with its audio and Escape cancels', async t =
   mode.onKeyDown({}, { key: 'Escape' });
   await flush();
   assert.equal(fake.messages.length, 1);
-  assert.equal(fake.items.size, 1);
+  assert.equal(fake.items.size, 2);
   assert.equal(played.length, 1);
 });
 
@@ -239,7 +246,7 @@ test('returning to the center sends caution and remote clients preserve the scen
   assert.equal(message.signalId, 'caution');
   receiver.messageHandler({ data: message, connectionId: 'bob-connection' });
   await flush();
-  assert.equal(receiver.items.size, 1);
+  assert.equal(receiver.items.size, 2);
   const marker = [...receiver.items.values()][0];
   assert.equal(marker.name, '注意 · Bob');
   assert.deepEqual(marker.position, { x: 400, y: 300 });
@@ -259,7 +266,7 @@ test('a quick center release waits for the initial image instead of leaving an o
   await flush();
   assert.equal(fake.messages.length, 1);
   assert.equal(fake.messages[0].data.signalId, 'caution');
-  assert.equal(fake.items.size, 1);
+  assert.equal(fake.items.size, 2);
   assert.ok([...fake.items.values()][0].id.includes('/ping/'));
 });
 
@@ -294,7 +301,7 @@ test('remote scene isolation and overlapping pings remain independent', async t 
     fake.messageHandler({ data: { ...message, eventId: `remote-${index}`, signalId: id }, connectionId: 'bob-connection' });
   }
   await flush();
-  assert.equal(fake.items.size, 3);
+  assert.equal(fake.items.size, 6);
   assert.ok([...fake.items.values()].every(item => item.name.includes('Bob')));
   fake.sceneReadyHandler(false);
   await flush();
@@ -318,7 +325,7 @@ test('temporary pings expire after three seconds', async t => {
     sceneKey: fake.metadata[EXTENSION_ID].sceneKey, signalId: 'missing', x: 0, y: 0 }, connectionId: 'bob-connection' });
   await flush();
   assert.equal(DISPLAY_MS, 3000);
-  assert.equal(fake.items.size, 1);
+  assert.equal(fake.items.size, 2);
   t.mock.timers.tick(DISPLAY_MS);
   await flush();
   assert.equal(fake.items.size, 0);
@@ -348,9 +355,9 @@ test('players share scene identity when metadata is read-only', async t => {
 });
 
 function projectedSize(item, dpi, zoom) {
-  const viewScale = Math.min(item.style.maxViewScale ?? Infinity, Math.max(item.style.minViewScale ?? 0, zoom));
-  return { width: item.image.width * item.scale.x * dpi / item.grid.dpi * viewScale,
-    height: item.image.height * item.scale.y * dpi / item.grid.dpi * viewScale };
+  const viewScale = Math.min(item.style.maxViewScale ?? Infinity, Math.max(item.style.minViewScale ?? 0, 1 / zoom));
+  return { width: item.image.width * item.scale.x * dpi / item.grid.dpi * zoom * viewScale,
+    height: item.image.height * item.scale.y * dpi / item.grid.dpi * zoom * viewScale };
 }
 
 test('one fixed screen frame preserves wheel and ping layout across extreme zoom and grid DPI', async t => {
@@ -370,6 +377,11 @@ test('one fixed screen frame preserves wheel and ping layout across extreme zoom
       assert.deepEqual(projectedSize(ping, dpi, zoom), { width: 200, height: 128 });
       assert.deepEqual(ping.position, { x: 900, y: 500 });
       assert.deepEqual(ping.grid.offset, { x: 200, y: 100 });
+      const label = [...fake.items.values()].find(item => item.image.mime === 'image/svg+xml');
+      assert.deepEqual(label.position, ping.position);
+      assert.deepEqual(label.grid, ping.grid);
+      assert.deepEqual(label.scale, ping.scale);
+      assert.deepEqual(label.style, ping.style);
       const release = event(400 + 120 / zoom, 300);
       mode.onToolMove({}, release);
       await flush();

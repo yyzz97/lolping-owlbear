@@ -5,6 +5,6 @@ const manifest = JSON.parse(await readFile(manifestUrl, 'utf8'));
 const hostedBase = 'https://yyzz97.github.io/lolping-owlbear/';
 
 manifest.icon = new URL('wheel.svg', hostedBase).href;
-manifest.background_url = new URL('index.html', hostedBase).href;
+manifest.background_url = new URL(`index.html?v=${manifest.version}`, hostedBase).href;
 
 await writeFile(manifestUrl, `${JSON.stringify(manifest, null, 2)}\n`);
