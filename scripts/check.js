@@ -14,10 +14,10 @@ for (const entry of await readdir(sourceDir, { withFileTypes: true })) {
 
 const manifest = JSON.parse(await readFile(path.join(root, 'public/manifest.json'), 'utf8'));
 const assetFiles = [
-  'Retreat_ping.png', 'Bait_ping.png', 'On_My_Way_ping.png', 'All_In_ping.png',
-  'Assist_Me_ping.png', 'Hold_ping.png', 'Enemy_Missing_ping.png', 'Push_ping.png', 'Caution_ping.png',
-  'Retreat_ping_SFX.ogg', 'Bait_ping_SFX.ogg', 'On_My_Way_ping_SFX.ogg', 'All_In_ping_SFX.ogg',
-  'Assist_Me_ping_SFX.ogg', 'Hold_ping_SFX.ogg', 'Enemy_Missing_ping_SFX.ogg', 'Push_ping_SFX.ogg', 'Caution_ping_SFX.ogg',
+  'Retreat_ping.png', 'Push_ping.png', 'On_My_Way_ping.png', 'All_In_ping.png',
+  'Assist_Me_ping.png', 'Need_Vision_ping.png', 'Enemy_Missing_ping.png', 'Enemy_Vision_ping.png', 'Caution_ping.png',
+  'Retreat_ping_SFX.ogg', 'Push_ping_SFX.ogg', 'On_My_Way_ping_SFX.ogg', 'All_In_ping_SFX.ogg',
+  'Assist_Me_ping_SFX.ogg', 'Need_Vision_ping_SFX.ogg', 'Enemy_Missing_ping_SFX.ogg', 'Enemy_Vision_ping_SFX.ogg', 'Caution_ping_SFX.ogg',
 ];
 for (const asset of assetFiles) await access(path.join(root, 'public/assets', asset));
 const uiAssets = uiAssetsFor(new URL('../public/', import.meta.url));

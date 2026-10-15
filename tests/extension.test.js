@@ -161,6 +161,8 @@ test('registers the toolbar and mode with the hosted wheel icon URL', async t =>
   const mode = fake.modes.values().next().value;
   assert.equal(tool.icons[0].icon, TEST_WHEEL_ICON);
   assert.equal(mode.icons[0].icon, TEST_WHEEL_ICON);
+  assert.equal(tool.shortcut, 'G');
+  assert.equal(mode.shortcut, 'G');
   assert.ok(fake.notifications.some(({ message, variant }) => message.includes('已加载') && variant === 'SUCCESS'));
 });
 
@@ -200,16 +202,16 @@ test('dragging updates overlay images without replacing the static wheel', async
   assert.equal(center.image.url, TEST_UI_ASSETS.wheelCenters.caution.url);
   mode.onToolMove({}, event(300, 240));
   await flush();
-  assert.equal(selection.name, 'ON MY WAY');
+  assert.equal(selection.name, '正在路上');
   assert.equal(selection.image.url, TEST_UI_ASSETS.wheelSelections.omw.url);
   assert.equal(center.image.url, TEST_UI_ASSETS.wheelCenters.omw.url);
   mode.onToolMove({}, event(120, 60));
   await flush();
-  assert.equal(selection.name, 'RETREAT');
+  assert.equal(selection.name, '撤退');
   assert.equal(center.image.url, TEST_UI_ASSETS.wheelCenters.retreat.url);
   mode.onToolMove({}, event(120, 240));
   await flush();
-  assert.equal(selection.name, 'CAUTION');
+  assert.equal(selection.name, '谨慎行事');
   assert.equal(center.image.url, TEST_UI_ASSETS.wheelCenters.caution.url);
   mode.onToolUp({}, event(300, 240));
   await flush();
@@ -222,11 +224,11 @@ test('dragging updates overlay images without replacing the static wheel', async
   );
   assert.equal(fake.items.size, 2, 'wheel is removed and the hosted icon plus native label remain');
   const marker = [...fake.items.values()][0];
-  assert.equal(marker.name, '正在路上 · Alice');
+  assert.equal(marker.name, 'Alice正在路上');
   assert.equal(marker.image.url, TEST_UI_ASSETS.pings.omw.url);
   const label = [...fake.items.values()][1];
   assert.equal(label.type, 'LABEL');
-  assert.equal(label.text.plainText, '正在路上 · Alice');
+  assert.equal(label.text.plainText, 'Alice正在路上');
   assert.equal(label.style.backgroundOpacity, 0);
   assert.equal(label.image, undefined);
 });
@@ -251,7 +253,7 @@ test('center release sends caution with its audio and Escape cancels', async t =
   assert.equal(fake.messages.length, 1);
   assert.equal(fake.messages[0].data.signalId, 'caution');
   assert.deepEqual(played, [TEST_SIGNAL_ASSETS.caution.audioUrl]);
-  assert.equal([...fake.items.values()][0].name, '注意 · Alice');
+  assert.equal([...fake.items.values()][0].name, 'Alice发出信号，请谨慎行事！');
   mode.onToolDown({}, event(20, 20));
   await flush();
   mode.onKeyDown({}, { key: 'Escape' });
@@ -278,7 +280,7 @@ test('returning to the center sends caution and remote clients preserve the scen
   await flush();
   assert.equal(receiver.items.size, 2);
   const marker = [...receiver.items.values()][0];
-  assert.equal(marker.name, '注意 · Bob');
+  assert.equal(marker.name, 'Bob发出信号，请谨慎行事！');
   assert.deepEqual(marker.position, { x: 400, y: 300 });
 });
 
@@ -308,7 +310,7 @@ test('all wheel states share a single image size, including bait and the full mi
   const wheel = [...fake.items.values()][0];
   const selection = [...fake.items.values()].find(item => item.id.includes('/wheel-selection/'));
   const center = [...fake.items.values()].find(item => item.id.includes('/wheel-center/'));
-  for (const [index, id] of ['retreat', 'bait', 'omw', 'allin', 'assist', 'hold', 'missing', 'push'].entries()) {
+  for (const [index, id] of ['retreat', 'push', 'omw', 'allin', 'assist', 'needvision', 'missing', 'enemyvision'].entries()) {
     const angle = (-90 + index * 45) * Math.PI / 180;
     mode.onToolMove({}, event(200 + 130 * Math.cos(angle), 200 + 130 * Math.sin(angle)));
     await flush();
@@ -320,7 +322,7 @@ test('all wheel states share a single image size, including bait and the full mi
   }
   mode.onToolMove({}, event(70, 200));
   await flush();
-  assert.equal([...fake.items.values()].find(item => item.id.includes('/wheel-selection/')).name, 'ENEMY MISSING');
+  assert.equal([...fake.items.values()].find(item => item.id.includes('/wheel-selection/')).name, '敌人消失');
 });
 
 test('remote scene isolation and overlapping pings remain independent', async t => {
@@ -330,7 +332,7 @@ test('remote scene isolation and overlapping pings remain independent', async t 
   fake.messageHandler({ data: { ...message, sceneKey: 'another-scene' }, connectionId: 'bob-connection' });
   await flush();
   assert.equal(fake.items.size, 0);
-  for (const [index, id] of ['danger', 'bait', 'caution'].entries()) {
+  for (const [index, id] of ['danger', 'enemyvision', 'caution'].entries()) {
     fake.messageHandler({ data: { ...message, eventId: `remote-${index}`, signalId: id }, connectionId: 'bob-connection' });
   }
   await flush();
@@ -357,7 +359,7 @@ test('temporary pings expire after three seconds', async t => {
   fake.messageHandler({ data: { v: 1, type: 'ping', eventId: 'expiry', userId: 'bob',
     sceneKey: fake.metadata[EXTENSION_ID].sceneKey, signalId: 'missing', x: 0, y: 0 }, connectionId: 'bob-connection' });
   await flush();
-  assert.equal(DISPLAY_MS, 3000);
+  assert.equal(DISPLAY_MS, 2000);
   assert.equal(fake.items.size, 2);
   t.mock.timers.tick(DISPLAY_MS);
   await flush();
@@ -407,7 +409,7 @@ test('players share scene identity when metadata is read-only', async t => {
   await flush();
   bob.messageHandler({ data: alice.messages[0].data, connectionId: 'alice-connection' });
   await flush();
-  assert.equal([...bob.items.values()][0].name, '正在路上 · 房间玩家');
+  assert.equal([...bob.items.values()][0].name, '房间玩家正在路上');
 });
 
 function projectedSize(item, dpi, zoom) {
@@ -435,7 +437,7 @@ test('fixed billboards and native labels share scene anchors across zoom and gri
       assert.deepEqual(ping.grid.offset, { x: 200, y: 100 });
       const label = [...fake.items.values()].find(item => item.type === 'LABEL');
       assert.deepEqual(label.position, ping.position);
-      assert.equal(label.text.width, 200);
+      assert.equal(label.text.width, 360);
       assert.equal(label.text.height, 60);
       assert.equal(label.style.pointerDirection, 'UP');
       assert.equal(label.style.pointerHeight, 0);
@@ -445,7 +447,7 @@ test('fixed billboards and native labels share scene anchors across zoom and gri
       const release = event(400 + 120 / zoom, 300);
       mode.onToolMove({}, release);
       await flush();
-      assert.equal([...fake.items.values()].find(item => item.id.includes('/wheel-selection/')).name, 'ON MY WAY', 'selection uses the current scale while the wheel is already open');
+      assert.equal([...fake.items.values()].find(item => item.id.includes('/wheel-selection/')).name, '正在路上', 'selection uses the current scale while the wheel is already open');
       mode.onToolMove({}, event(400, 300));
       await flush();
     }
@@ -476,4 +478,32 @@ test('bursts of pointer events skip stale positions and release sends the latest
   assert.equal(fake.messages.length, 1);
   assert.equal(fake.messages[0].data.signalId, 'retreat');
   assert.ok([...fake.items.values()].every(item => !item.image || item.image.url.startsWith('https://')));
+});
+
+test('G shortcut keeps the wheel gesture active until the left button is released', async t => {
+  const fake = await setup(t, 1);
+  const mode = fake.modes.values().next().value;
+  mode.onKeyDown({}, { key: 'g', code: 'KeyG' });
+  mode.onToolDown({}, event(300, 300));
+  await flush();
+  mode.onToolMove({}, event(450, 300));
+  await flush();
+  mode.onToolUp({}, event(450, 300));
+  await flush();
+  mode.onKeyUp({}, { key: 'g', code: 'KeyG' });
+  assert.equal(fake.messages.length, 1);
+  assert.equal(fake.messages[0].data.signalId, 'omw');
+});
+
+test('the fifth ping within five seconds starts the twelve second cooldown', async t => {
+  const fake = await setup(t, 1);
+  const mode = fake.modes.values().next().value;
+  for (let index = 0; index < 5; index++) {
+    mode.onToolDown({}, event(300, 300));
+    await flush();
+    mode.onToolUp({}, event(300, 300));
+    await flush();
+  }
+  assert.equal(fake.messages.length, 4);
+  assert.ok(fake.notifications.some(({ message, variant }) => variant === 'WARNING' && message.includes('12 秒')));
 });

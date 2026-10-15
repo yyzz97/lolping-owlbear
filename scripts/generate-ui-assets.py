@@ -17,7 +17,7 @@ def sector_radius(index):
     return CARDINAL_OUTER if index % 2 == 0 else DIAGONAL_OUTER
 
 def sector_image(index, selected):
-    rgb, opacity = ((24, 160, 218), 0.64) if selected else ((0, 0, 0), 0.48)
+    rgb, opacity = ((24, 160, 218), 0.64) if selected else ((0, 0, 0), 0.60 if index % 2 == 0 else 0.48)
     image = Image.new("RGBA", (CANVAS, CANVAS))
     pixels = image.load()
     radius_limit = sector_radius(index)
@@ -33,9 +33,9 @@ def sector_image(index, selected):
                 if selected:
                     radial = max(0, 1 - distance) ** 0.7
                 elif index % 2 == 0:
-                    # Keep a subtle inner-to-outer falloff on the four
-                    # cardinal wedges while diagonals stay flat black.
-                    radial = 0.82 - 0.62 * max(0, min(1, distance))
+                    # Cardinal wedges are darker near the core and fade
+                    # completely into the map at their curved outer edge.
+                    radial = max(0, 1 - distance ** 0.8)
                 else:
                     radial = 1
                 pixels[x, y] = (*rgb, round(255 * opacity * radial * edge))
@@ -64,7 +64,7 @@ for name, color in colors.items():
 image = Image.new("RGBA", (128, 64))
 draw = ImageDraw.Draw(image)
 draw.rounded_rectangle((3, 3, 124, 60), radius=9, fill=(31, 42, 47, 145), outline=(184, 175, 176, 220), width=3)
-font = ImageFont.truetype("C:/Windows/Fonts/arialbd.ttf", 34)
+font = ImageFont.truetype("C:/Windows/Fonts/msyhbd.ttc", 34)
 draw.text((64, 32), "ESC", font=font, fill=(206, 201, 195, 255), anchor="mm")
 image.save(OUTPUT / "esc-key.png", optimize=True)
 
@@ -72,15 +72,15 @@ geometry = (OUTPUT.parents[1] / 'src' / 'geometry.js').read_text(encoding='utf-8
 inner, icon_radius, icon_size = [int(re.search(rf'{key}: (\d+)', geometry)[1])
     for key in ['innerRadius', 'iconRadius', 'iconSize']]
 signals = [
-    ('retreat', 'Retreat', 'RETREAT', '#f12c55', 'red'),
-    ('bait', 'Bait', 'BAIT', '#d8c79a', 'gold'),
-    ('omw', 'On_My_Way', 'ON MY WAY', '#22b9e9', 'blue'),
-    ('allin', 'All_In', 'ALL IN', '#d8c79a', 'gold'),
-    ('assist', 'Assist_Me', 'ASSIST ME', '#16ce86', 'green'),
-    ('hold', 'Hold', 'HOLD', '#d8c79a', 'gold'),
-    ('missing', 'Enemy_Missing', 'ENEMY MISSING', '#f6ba00', 'yellow'),
-    ('push', 'Push', 'PUSH', '#16ce86', 'green'),
-    ('caution', 'Caution', 'CAUTION', '#f6ba00', 'yellow'),
+    ('retreat', 'Retreat', '撤退', '#f12c55', 'red'),
+    ('push', 'Push', '推进', '#16ce86', 'green'),
+    ('omw', 'On_My_Way', '正在路上', '#22b9e9', 'blue'),
+    ('allin', 'All_In', '全力进攻', '#d8c79a', 'gold'),
+    ('assist', 'Assist_Me', '协助我', '#16ce86', 'green'),
+    ('needvision', 'Need_Vision', '需要视野', '#16ce86', 'green'),
+    ('missing', 'Enemy_Missing', '敌人消失', '#f6ba00', 'yellow'),
+    ('enemyvision', 'Enemy_Vision', '敌方视野', '#f12c55', 'red'),
+    ('caution', 'Caution', '谨慎行事', '#f6ba00', 'yellow'),
 ]
 
 def paste_icon(canvas, signal, point, size):
@@ -112,8 +112,8 @@ def draw_base():
         paste_icon(canvas, outer_signal, (center + icon_radius * cos(angle), center + icon_radius * sin(angle)), icon_size)
     canvas.alpha_composite(Image.open(OUTPUT / 'esc-key.png').resize((48, 24), Image.Resampling.LANCZOS),
                            (round(center * SCALE - 60), round(center * SCALE + 72)))
-    ImageDraw.Draw(canvas).text((round(center * SCALE + 22), round(center * SCALE + 84)), 'Back',
-                                font=ImageFont.truetype('C:/Windows/Fonts/arial.ttf', 22), fill='#b8afb0', anchor='mm')
+    ImageDraw.Draw(canvas).text((round(center * SCALE + 22), round(center * SCALE + 84)), '返回',
+                                font=ImageFont.truetype('C:/Windows/Fonts/msyhbd.ttc', 22), fill='#b8afb0', anchor='mm')
     return canvas
 
 base = draw_base()
@@ -127,7 +127,7 @@ for selected, signal in enumerate(signals):
     selection.save(OUTPUT / f'wheel-selection-{signal[0]}.png', optimize=True)
     center = Image.new('RGBA', (CANVAS, CANVAS))
     paste_icon(center, signal, (CENTER / SCALE, CENTER / SCALE - 44), 32)
-    label_font = ImageFont.truetype('C:/Windows/Fonts/arialbd.ttf', 28 if signal[0] == 'missing' else 30)
+    label_font = ImageFont.truetype('C:/Windows/Fonts/msyhbd.ttc', 28 if signal[0] == 'missing' else 30)
     ImageDraw.Draw(center).text((CENTER, CENTER), signal[2], font=label_font, fill=signal[3], anchor='mm')
     center.save(OUTPUT / f'wheel-center-{signal[0]}.png', optimize=True)
     full = base.copy()

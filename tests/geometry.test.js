@@ -5,7 +5,7 @@ import { SIGNALS } from '../src/signals.js';
 
 test('wheel sectors follow the reference image clockwise from the top', () => {
   assert.deepEqual(SIGNALS.map(signal => signal.id), [
-    'retreat', 'bait', 'omw', 'allin', 'assist', 'hold', 'missing', 'push',
+    'retreat', 'push', 'omw', 'allin', 'assist', 'needvision', 'missing', 'enemyvision',
   ]);
 });
 

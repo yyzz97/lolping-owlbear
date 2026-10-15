@@ -7,7 +7,10 @@ export const EXTENSION_ID = 'com.github.dmhpj.lolping-owlbear';
 export const TOOL_ID = `${EXTENSION_ID}/tool`;
 export const MODE_ID = `${TOOL_ID}/mode`;
 export const CHANNEL = `${EXTENSION_ID}/pings`;
-export const DISPLAY_MS = 3000;
+export const DISPLAY_MS = 2000;
+export const PING_WINDOW_MS = 5000;
+export const PING_LIMIT = 4;
+export const PING_COOLDOWN_MS = 12000;
 
 const SCENE_METADATA_KEY = 'sceneKey';
 const validSceneKey = value => typeof value === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(value);
@@ -65,6 +68,9 @@ export function registerExtension(OBR, { buildBillboard, buildLabel, signalAsset
   let players = new Map();
   let ready = false;
   let closed = false;
+  let shortcutHeld = false;
+  let sendTimes = [];
+  let blockedUntil = 0;
   const unsubscribers = [];
 
   function deleteIds(ids) {
@@ -89,7 +95,7 @@ export function registerExtension(OBR, { buildBillboard, buildLabel, signalAsset
     const signal = signalById(message.signalId);
     if (!signal || !ready || message.sceneKey !== sceneKey) return false;
     const key = sceneKey;
-    const label = `${signal.name} · ${sender}`;
+    const label = `${sender}${signal.message}`;
     const dpi = await OBR.scene.grid.getDpi();
     if (!ready || key !== sceneKey) return false;
     const image = uiAssets.pings[signal.id];
@@ -99,10 +105,10 @@ export function registerExtension(OBR, { buildBillboard, buildLabel, signalAsset
     const text = buildLabel()
       .id(`${EXTENSION_ID}/ping-label/${crypto.randomUUID()}`)
       .name(label)
-      .plainText(Array.from(label).slice(0, 64).join(''))
+      .plainText(Array.from(label).slice(0, 100).join(''))
       .position(point)
-      .width(200).height(60).padding(0)
-      .fontFamily('Roboto').fontSize(13).fontWeight(700)
+      .width(360).height(60).padding(0)
+      .fontFamily('Microsoft YaHei').fontSize(13).fontWeight(700)
       .textAlign('CENTER').textAlignVertical('BOTTOM')
       .fillColor('#fff7e8').strokeColor('#111b20').strokeWidth(1)
       .backgroundOpacity(0)
@@ -153,6 +159,7 @@ export function registerExtension(OBR, { buildBillboard, buildLabel, signalAsset
     const point = { x: event.pointerPosition.x, y: event.pointerPosition.y };
     const current = {
       point, sceneKey, itemIds: [], hot: -1,
+      shortcutGesture: shortcutHeld,
       ready: false, updating: false, tail: Promise.resolve(), pendingPosition: null, pendingFinish: null,
     };
     gesture = current;
@@ -221,6 +228,10 @@ export function registerExtension(OBR, { buildBillboard, buildLabel, signalAsset
       current.pendingFinish = event;
       return;
     }
+    if (current.shortcutGesture && !shortcutHeld) {
+      cancelWheel();
+      return;
+    }
     move(event);
     await current.tail;
     if (gesture !== current) return;
@@ -228,6 +239,14 @@ export function registerExtension(OBR, { buildBillboard, buildLabel, signalAsset
     deleteIds(current.itemIds);
     if (!ready || current.sceneKey !== sceneKey) return;
     const signal = current.hot < 0 ? DEFAULT_SIGNAL : SIGNALS[current.hot];
+    const now = Date.now();
+    sendTimes = sendTimes.filter(timestamp => now - timestamp < PING_WINDOW_MS);
+    if (now < blockedUntil || sendTimes.length >= PING_LIMIT) {
+      blockedUntil = Math.max(blockedUntil, now + PING_COOLDOWN_MS);
+      void OBR.notification.show(`信号过于频繁，请 ${Math.ceil((blockedUntil - now) / 1000)} 秒后再试。`, 'WARNING').catch(() => {});
+      return;
+    }
+    sendTimes.push(now);
     const userId = OBR.player.id;
     const message = createPing({ userId, sceneKey, signalId: signal.id, x: current.point.x, y: current.point.y });
     let sender = '房间玩家';
@@ -273,6 +292,7 @@ export function registerExtension(OBR, { buildBillboard, buildLabel, signalAsset
         id: TOOL_ID,
         icons: [{ icon: wheelIcon, label: '英雄联盟信号轮盘' }],
         defaultMode: MODE_ID,
+        shortcut: 'G',
       });
     } catch (error) {
       reportStartupError(OBR, '工具栏注册', error);
@@ -292,11 +312,19 @@ export function registerExtension(OBR, { buildBillboard, buildLabel, signalAsset
         onToolUp: (_context, event) => { void finish(event); },
         onToolDragCancel: cancelWheel,
         onKeyDown: (_context, event) => {
+          if (event.key?.toLowerCase() === 'g' || event.code === 'KeyG') shortcutHeld = true;
           if (event.key === 'Escape') cancelWheel();
         },
+        onKeyUp: (_context, event) => {
+          if (event.key?.toLowerCase() === 'g' || event.code === 'KeyG') {
+            shortcutHeld = false;
+            if (gesture) cancelWheel();
+          }
+        },
+        shortcut: 'G',
         onDeactivate: cancelWheel,
         onActivate: () => {
-          void OBR.notification.show('在地图上按住左键并向信号方向拖动，松开发送；按 Esc 取消。', 'INFO').catch(() => {});
+          void OBR.notification.show('按住 G 和鼠标左键打开轮盘，移动到方向后松开左键发送；松开 G 或按 Esc 取消。', 'INFO').catch(() => {});
         },
       });
     } catch (error) {

@@ -10,11 +10,11 @@ const asset = file => ({
 
 const signalAssets = Object.freeze({
   retreat: asset('Retreat_ping'),
-  bait: asset('Bait_ping'),
+  enemyvision: asset('Enemy_Vision_ping'),
   omw: asset('On_My_Way_ping'),
   allin: asset('All_In_ping'),
   assist: asset('Assist_Me_ping'),
-  hold: asset('Hold_ping'),
+  needvision: asset('Need_Vision_ping'),
   missing: asset('Enemy_Missing_ping'),
   push: asset('Push_ping'),
   caution: asset('Caution_ping'),

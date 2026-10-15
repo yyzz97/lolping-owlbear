@@ -1,8 +1,8 @@
 export function uiAssetsFor(base) {
   const image = (file, width, height = width) => ({
-    width, height, mime: 'image/png', url: new URL(`./ui/${file}.png?v=3`, base).href,
+    width, height, mime: 'image/png', url: new URL(`./ui/${file}.png?v=4`, base).href,
   });
-  const ids = ['retreat', 'bait', 'omw', 'allin', 'assist', 'hold', 'missing', 'push', 'caution'];
+  const ids = ['retreat', 'push', 'omw', 'allin', 'assist', 'needvision', 'missing', 'enemyvision', 'caution'];
   return {
     wheels: Object.fromEntries(ids.map(id => [id, image(`wheel-${id}`, 728)])),
     wheelBase: image('wheel-base', 728),
