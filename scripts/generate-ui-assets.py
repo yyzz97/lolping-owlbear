@@ -7,17 +7,19 @@ from PIL import Image, ImageDraw, ImageFont
 OUTPUT = Path(__file__).resolve().parents[1] / "public" / "ui"
 OUTPUT.mkdir(exist_ok=True)
 SCALE = 2
-CANVAS = 728
+CANVAS = 800
 CENTER = CANVAS // 2
 INNER = 85
-CARDINAL_OUTER = 180
-DIAGONAL_OUTER = 150
+# The diagonal wedges reach the old cardinal edge.  Cardinal wedges then
+# continue a little farther and fade out quickly over that extra span.
+CARDINAL_OUTER = 195
+DIAGONAL_OUTER = 180
 
 def sector_radius(index):
     return CARDINAL_OUTER if index % 2 == 0 else DIAGONAL_OUTER
 
 def sector_image(index, selected):
-    rgb, opacity = ((24, 160, 218), 0.64) if selected else ((0, 0, 0), 0.68 if index % 2 == 0 else 0.38)
+    rgb, opacity = ((24, 160, 218), 0.64) if selected else ((0, 0, 0), 0.68 if index % 2 == 0 else 0.32)
     image = Image.new("RGBA", (CANVAS, CANVAS))
     pixels = image.load()
     radius_limit = sector_radius(index)
@@ -33,9 +35,13 @@ def sector_image(index, selected):
                 if selected:
                     radial = max(0, 1 - distance) ** 0.7
                 elif index % 2 == 0:
-                    # Cardinal wedges are darker near the core and fade
-                    # completely into the map at their curved outer edge.
-                    radial = max(0, 1 - distance ** 0.8)
+                    # Keep the cardinal dark area through the diagonal edge,
+                    # then fade quickly through the extra cardinal extension.
+                    if radius <= DIAGONAL_OUTER:
+                        radial = 1
+                    else:
+                        fade = (radius - DIAGONAL_OUTER) / max(1, CARDINAL_OUTER - DIAGONAL_OUTER)
+                        radial = max(0, 1 - fade * fade * (3 - 2 * fade))
                 else:
                     radial = 1
                 pixels[x, y] = (*rgb, round(255 * opacity * radial * edge))
@@ -98,13 +104,28 @@ def draw_base():
     draw = ImageDraw.Draw(canvas)
     for index in range(8):
         angle = (-112.5 + index * 45) * pi / 180
-        radius = CARDINAL_OUTER
+        radius = sector_radius(index)
         draw.line(((center + INNER * cos(angle)) * SCALE, (center + INNER * sin(angle)) * SCALE,
                    (center + radius * cos(angle)) * SCALE, (center + radius * sin(angle)) * SCALE),
                   fill=(210, 180, 112, 210), width=2)
+    center_disc = Image.new('RGBA', (CANVAS, CANVAS))
+    disc_pixels = center_disc.load()
+    for y in range(CANVAS):
+        for x in range(CANVAS):
+            dx, dy = (x + 0.5) / SCALE - center, (y + 0.5) / SCALE - center
+            radius = hypot(dx, dy)
+            if radius <= inner:
+                mix = min(1, radius / inner)
+                # Low-saturation deep green at the center, fading to black.
+                start = (16, 49, 45)
+                end = (2, 7, 8)
+                rgb = tuple(round(start[channel] * (1 - mix) + end[channel] * mix) for channel in range(3))
+                disc_pixels[x, y] = (*rgb, 226)
+    canvas.alpha_composite(center_disc)
+    draw = ImageDraw.Draw(canvas)
     draw.ellipse(((center - inner) * SCALE, (center - inner) * SCALE,
                   (center + inner) * SCALE, (center + inner) * SCALE),
-                 fill=(11, 36, 38, 210), outline=(200, 170, 110, 250), width=3)
+                 outline=(200, 170, 110, 250), width=3)
     draw.ellipse(((center - 78) * SCALE, (center - 78) * SCALE,
                   (center + 78) * SCALE, (center + 78) * SCALE),
                  outline=(216, 199, 154, 255), width=6)
@@ -125,6 +146,9 @@ for selected, signal in enumerate(signals):
     selection = Image.new('RGBA', (CANVAS, CANVAS))
     if selected < 8:
         selection.alpha_composite(Image.open(OUTPUT / f'sector-{selected}-selected.png'))
+        angle = (-90 + selected * 45) * pi / 180
+        paste_icon(selection, signal, (CENTER / SCALE + icon_radius * cos(angle),
+                                       CENTER / SCALE + icon_radius * sin(angle)), icon_size)
     selection.save(OUTPUT / f'wheel-selection-{signal[0]}.png', optimize=True)
     center = Image.new('RGBA', (CANVAS, CANVAS))
     paste_icon(center, signal, (CENTER / SCALE, CENTER / SCALE - 44), 32)

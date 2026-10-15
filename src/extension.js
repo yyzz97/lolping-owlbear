@@ -74,7 +74,8 @@ export function registerExtension(OBR, { buildBillboard, buildLabel, signalAsset
   let blockedUntil = 0;
   let globalInputBound = false;
   let restoreTool = null;
-  let autoActivating = false;
+  let lastActiveTool = null;
+  let lastActiveMode = null;
   const unsubscribers = [];
 
   function deleteIds(ids) {
@@ -98,23 +99,6 @@ export function registerExtension(OBR, { buildBillboard, buildLabel, signalAsset
       }
     } catch {
       // The previous tool may have been removed while the gesture was active.
-    }
-  }
-
-  async function activateShortcutTool() {
-    if (typeof OBR.tool.getActiveTool !== 'function' || typeof OBR.tool.activateTool !== 'function') return;
-    try {
-      const activeTool = await OBR.tool.getActiveTool();
-      if (activeTool === TOOL_ID) return;
-      const activeMode = typeof OBR.tool.getActiveToolMode === 'function'
-        ? await OBR.tool.getActiveToolMode() : undefined;
-      restoreTool = { toolId: activeTool, modeId: activeMode };
-      autoActivating = true;
-      await OBR.tool.activateTool(TOOL_ID);
-      autoActivating = false;
-    } catch {
-      autoActivating = false;
-      restoreTool = null;
     }
   }
 
@@ -384,10 +368,18 @@ export function registerExtension(OBR, { buildBillboard, buildLabel, signalAsset
   unsubscribers.push(OBR.onReady(async () => {
     if (closed) return;
     try {
+      if (typeof OBR.tool.getActiveTool === 'function') lastActiveTool = await OBR.tool.getActiveTool();
+      if (typeof OBR.tool.getActiveToolMode === 'function') lastActiveMode = await OBR.tool.getActiveToolMode();
+    } catch {
+      lastActiveTool = null;
+      lastActiveMode = null;
+    }
+    try {
       await OBR.tool.create({
         id: TOOL_ID,
         icons: [{ icon: wheelIcon, label: '英雄联盟信号轮盘' }],
         defaultMode: MODE_ID,
+        shortcut: 'G',
       });
     } catch (error) {
       reportStartupError(OBR, '工具栏注册', error);
@@ -413,23 +405,15 @@ export function registerExtension(OBR, { buildBillboard, buildLabel, signalAsset
         onKeyUp: (_context, event) => {
           if (event.key?.toLowerCase() === 'g' || event.code === 'KeyG') {
             shortcutHeld = false;
-            if (gesture) cancelWheel();
+            if (gesture?.shortcutGesture) cancelWheel();
             void restorePreviousTool();
           }
         },
         onDeactivate: cancelWheel,
         onActivate: () => {
-          if (autoActivating) return;
-          void OBR.notification.show('按住 G 和鼠标左键打开轮盘，移动到方向后松开左键发送；松开 G 或按 Esc 取消。', 'INFO').catch(() => {});
-        },
-      });
-      await OBR.tool.createAction({
-        id: ACTION_ID,
-        shortcut: 'G',
-        icons: [{ icon: wheelIcon, label: 'G+鼠标左键信号轮盘', filter: { activeTools: [`${ACTION_ID}/hidden`] } }],
-        onClick: () => {
-          shortcutHeld = true;
-          void activateShortcutTool();
+          if (!restoreTool && lastActiveTool && lastActiveTool !== TOOL_ID) {
+            restoreTool = { toolId: lastActiveTool, modeId: lastActiveMode };
+          }
         },
       });
     } catch (error) {
@@ -446,6 +430,19 @@ export function registerExtension(OBR, { buildBillboard, buildLabel, signalAsset
         players = new Map(party.map(player => [player.connectionId, player.name || '房间玩家']));
       }));
       unsubscribers.push(OBR.scene.onReadyChange(sceneChanged));
+      if (typeof OBR.tool.onToolChange === 'function') {
+        unsubscribers.push(OBR.tool.onToolChange(id => {
+          if (id !== TOOL_ID) {
+            lastActiveTool = id;
+            restoreTool = restoreTool?.toolId === id ? restoreTool : null;
+          } else if (!restoreTool && lastActiveTool && lastActiveTool !== TOOL_ID) {
+            restoreTool = { toolId: lastActiveTool, modeId: lastActiveMode };
+          }
+        }));
+      }
+      if (typeof OBR.tool.onToolModeChange === 'function') {
+        unsubscribers.push(OBR.tool.onToolModeChange(id => { lastActiveMode = id; }));
+      }
       unsubscribers.push(OBR.scene.onMetadataChange(metadata => {
         const updatedKey = metadata[EXTENSION_ID]?.[SCENE_METADATA_KEY];
         if (ready && validSceneKey(updatedKey) && updatedKey !== sceneKey) {
