@@ -1,17 +1,10 @@
 export function uiAssetsFor(base) {
   const image = (file, width, height = width) => ({
-    width, height, mime: 'image/png', url: new URL(`./ui/${file}.png?v=2`, base).href,
+    width, height, mime: 'image/png', url: new URL(`./ui/${file}.png?v=3`, base).href,
   });
-  const rings = Object.fromEntries([
-    ['#f12c55', 'red'], ['#d8c79a', 'gold'], ['#22b9e9', 'blue'],
-    ['#16ce86', 'green'], ['#f6ba00', 'yellow'],
-  ].map(([color, file]) => [color, image(`ring-${file}`, 256, 176)]));
+  const ids = ['retreat', 'bait', 'omw', 'allin', 'assist', 'hold', 'missing', 'push', 'caution'];
   return {
-    sectors: Array.from({ length: 8 }, (_, index) => ({
-      idle: image(`sector-${index}-idle`, 688),
-      selected: image(`sector-${index}-selected`, 688),
-    })),
-    rings,
-    esc: image('esc-key', 128, 64),
+    wheels: Object.fromEntries(ids.map(id => [id, image(`wheel-${id}`, 688)])),
+    pings: Object.fromEntries(ids.map(id => [id, image(`ping-${id}`, 400, 256)])),
   };
 }

@@ -10,7 +10,7 @@ This is a standalone Owlbear Rodeo 2 extension built with `@owlbear-rodeo/sdk`. 
 4. On the map, hold the left mouse button to open the wheel, drag toward one of eight signals, then release to send it. Releasing in the center sends the default **Caution** ping; press **Esc** to cancel.
 5. Everyone in the same room with the extension enabled sees the same scene-point ping, the sender name, and the signal name. Signals stack when they overlap and fade after three seconds.
 
-The wheel uses a compact center disc, thin gold radial guides, gray transparent gradients for idle sectors and blue gradients for the selected sector. The center preview renders above the disc, with an Esc keycap and Back hint below it. The supplied PNG signal icons use centered Owlbear billboards sized in CSS pixels, and switching assets updates their image grid as well as their dimensions. The wheel geometry and item positions compensate for the current viewport scale; billboards and label text retain their native screen size. A sent ping shows its signal icon above a softly glowing oval ring with a short sender/signal label on a transparent background. The signal is anchored to the point where the gesture began. The supplied OGG cues are played locally; Web Audio remains a fallback when a browser blocks or cannot load a cue. Bait uses the supplied `Bait_ping_SFX.ogg`.
+The wheel uses a compact center disc, thin gold radial guides, black transparent gradients for idle sectors and blue gradients for the selected sector. Each wheel state is a single transparent PNG containing the icons, full center label, and aligned Esc/Back hint. Each ping also combines the signal icon, glowing oval and sender label into one bitmap. Owlbear billboards pin both view-scale limits to 1 and use the current scene grid DPI, so zoom cannot move or resize the components independently. The wheel is 344 CSS pixels wide, and its selection uses the current viewport scale even when zoom changes during the gesture. Signals stay anchored to the original scene point. The supplied OGG cues play locally; Web Audio remains a fallback when a browser blocks or cannot load a cue. Bait uses the supplied `Bait_ping_SFX.ogg`.
 
 ## Develop
 
@@ -26,13 +26,15 @@ npm run build
 
 Use the Vite URL for local extension development. `npm run build` writes the Owlbear manifest, background page, and assets to `dist/`; the build step converts manifest resource paths to the hosted GitHub Pages URLs.
 
-The wheel's inner and outer radii are 85 and 170 CSS pixels (1:2), including the center selection boundary and sector artwork. The transparent UI artwork is committed in `public/ui/`. Regenerate it with `python scripts/generate-ui-assets.py` on Windows with Pillow installed; Python and Pillow are not required to build or run the extension.
+The wheel's inner and outer radii are 85 and 170 CSS pixels (1:2), including the center selection boundary and sector artwork. Outer icons are 42 pixels, and center previews are 32 pixels. The transparent UI artwork is committed in `public/ui/`. Regenerate it with `python scripts/generate-ui-assets.py` on Windows with Pillow installed; Python and Pillow are not required to build or run the extension. With the Vite server running, `/tests/render-fixture.html` previews all wheel states and the browser's actual PNG/text composition.
 
 ## Two-client acceptance
 
 Install the same manifest in two clients in one room. Give the clients different map zoom and pan positions, then send each of the eight signals: Retreat, Bait, On My Way, All In, Assist Me, Hold, Enemy Missing, and Push. Both clients should see each marker on the same scene point with the sender and signal name; a second signal can overlap it, and both disappear after three seconds. Release in the wheel center to send Caution; press **Esc** to cancel. Switch scenes and verify old markers disappear and new signals do not cross into the other scene.
 
 The unit tests use a mock Owlbear API. They do not replace this live, two-client check.
+
+Check minimum and maximum map zoom, then zoom again while a wheel is open and while a ping is visible. The entire wheel must retain its shape and size, and ping labels must stay below their rings. Check `ENEMY MISSING` is complete, and compare clients whose scenes use different grid DPI values.
 
 ## Notes
 
