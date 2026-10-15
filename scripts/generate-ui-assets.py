@@ -17,9 +17,9 @@ for index in range(8):
                 dx, dy = (x + 0.5) / 2 - 172, (y + 0.5) / 2 - 172
                 radius = hypot(dx, dy)
                 angle = (atan2(dy, dx) * 180 / pi + 112.5 - index * 45) % 360
-                if 102 <= radius <= 170 and angle < 45:
-                    radial = max(0, 1 - (radius - 102) / 68) ** 0.7
-                    edge = min(1, angle / 0.6, (45 - angle) / 0.6, (radius - 102) / 0.6)
+                if 85 <= radius <= 170 and angle < 45:
+                    radial = max(0, 1 - (radius - 85) / 85) ** 0.7
+                    edge = min(1, angle / 0.6, (45 - angle) / 0.6, (radius - 85) / 0.6)
                     pixels[x, y] = (*rgb, round(255 * opacity * radial * edge))
         image.save(OUTPUT / f"sector-{index}-{state}.png", optimize=True)
 

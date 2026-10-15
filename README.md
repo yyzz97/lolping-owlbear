@@ -26,7 +26,7 @@ npm run build
 
 Use the Vite URL for local extension development. `npm run build` writes the Owlbear manifest, background page, and assets to `dist/`; the build step converts manifest resource paths to the hosted GitHub Pages URLs.
 
-The transparent UI artwork is committed in `public/ui/`. Regenerate it with `python scripts/generate-ui-assets.py` on Windows with Pillow installed; Python and Pillow are not required to build or run the extension.
+The wheel's inner and outer radii are 85 and 170 CSS pixels (1:2), including the center selection boundary and sector artwork. The transparent UI artwork is committed in `public/ui/`. Regenerate it with `python scripts/generate-ui-assets.py` on Windows with Pillow installed; Python and Pillow are not required to build or run the extension.
 
 ## Two-client acceptance
 

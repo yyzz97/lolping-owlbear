@@ -435,7 +435,7 @@ test('wheel geometry and icons compensate zoom while labels retain their native 
     assert.equal(esc.scale.x * esc.image.width / esc.grid.dpi * 96, 32);
     assert.equal(esc.scale.y * esc.image.height / esc.grid.dpi * 96, 16);
     assert.ok(Math.abs(esc.position.x * scale + 27) < 0.0001);
-    assert.equal(WHEEL.innerRadius, 102);
+    assert.equal(WHEEL.innerRadius, 85);
     assert.equal(WHEEL.outerRadius, 170);
   }
 });

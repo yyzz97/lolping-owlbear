@@ -1,6 +1,6 @@
 export function uiAssetsFor(base) {
   const image = (file, width, height = width) => ({
-    width, height, mime: 'image/png', url: new URL(`./ui/${file}.png`, base).href,
+    width, height, mime: 'image/png', url: new URL(`./ui/${file}.png?v=2`, base).href,
   });
   const rings = Object.fromEntries([
     ['#f12c55', 'red'], ['#d8c79a', 'gold'], ['#22b9e9', 'blue'],
