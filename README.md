@@ -7,10 +7,10 @@ This is a standalone Owlbear Rodeo 2 extension built with `@owlbear-rodeo/sdk`. 
 1. In Owlbear Rodeo, add this production manifest URL: <https://yyzz97.github.io/lolping-owlbear/manifest.json>. For development, run `npm run dev` and add the local Vite URL's `/manifest.json`.
 2. In the room, open the Extensions menu and enable **lolPing · Signal Wheel for Owlbear Rodeo**.
 3. Select the extension's tool in the room toolbar.
-4. On the map, hold the left mouse button to open the wheel, drag toward one of eight signals, then release to send it. The center shows the selected signal; release near the center or press **Esc** to cancel.
+4. On the map, hold the left mouse button to open the wheel, drag toward one of eight signals, then release to send it. Releasing in the center sends the default **Caution** ping; press **Esc** to cancel.
 5. Everyone in the same room with the extension enabled sees the same scene-point ping, the sender name, and the signal name. Signals stack when they overlap and fade after three seconds.
 
-The wheel uses a compact dark center disc, thin gold radial guides, and the supplied signal PNGs for the wheel, center preview, and map marker. PNG markers use centered Owlbear billboards sized in CSS pixels; the wheel and ring compensate for the current viewport scale, while label text retains its native screen size and its position follows the viewport scale. A sent ping shows its signal icon above an open oval ring with a short sender/signal label below. The signal is anchored to the point where the gesture began. The supplied OGG cues are played locally; Web Audio remains a fallback when a browser blocks or cannot load a cue. Bait uses the supplied `Bait_ping_SFX.ogg`.
+The wheel uses a compact center disc, thin gold radial guides, gray transparent gradients for idle sectors and blue gradients for the selected sector. The center preview renders above the disc, with an Esc keycap and Back hint below it. The supplied PNG signal icons use centered Owlbear billboards sized in CSS pixels, and switching assets updates their image grid as well as their dimensions. The wheel geometry and item positions compensate for the current viewport scale; billboards and label text retain their native screen size. A sent ping shows its signal icon above a softly glowing oval ring with a short sender/signal label on a transparent background. The signal is anchored to the point where the gesture began. The supplied OGG cues are played locally; Web Audio remains a fallback when a browser blocks or cannot load a cue. Bait uses the supplied `Bait_ping_SFX.ogg`.
 
 ## Develop
 
@@ -26,9 +26,11 @@ npm run build
 
 Use the Vite URL for local extension development. `npm run build` writes the Owlbear manifest, background page, and assets to `dist/`; the build step converts manifest resource paths to the hosted GitHub Pages URLs.
 
+The transparent UI artwork is committed in `public/ui/`. Regenerate it with `python scripts/generate-ui-assets.py` on Windows with Pillow installed; Python and Pillow are not required to build or run the extension.
+
 ## Two-client acceptance
 
-Install the same manifest in two clients in one room. Give the clients different map zoom and pan positions, then send each of the eight signals: Retreat, Bait, On My Way, All In, Assist Me, Hold, Enemy Missing, and Push. Both clients should see each marker on the same scene point with the sender and signal name; a second signal can overlap it, and both disappear after three seconds. Release near the wheel center or press **Esc** to cancel. Switch scenes and verify old markers disappear and new signals do not cross into the other scene.
+Install the same manifest in two clients in one room. Give the clients different map zoom and pan positions, then send each of the eight signals: Retreat, Bait, On My Way, All In, Assist Me, Hold, Enemy Missing, and Push. Both clients should see each marker on the same scene point with the sender and signal name; a second signal can overlap it, and both disappear after three seconds. Release in the wheel center to send Caution; press **Esc** to cancel. Switch scenes and verify old markers disappear and new signals do not cross into the other scene.
 
 The unit tests use a mock Owlbear API. They do not replace this live, two-client check.
 

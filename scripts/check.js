@@ -2,6 +2,7 @@ import { access, readdir, readFile } from 'node:fs/promises';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import { uiAssetsFor } from '../src/ui-assets.js';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const sourceDir = path.join(root, 'src');
@@ -19,6 +20,10 @@ const assetFiles = [
   'Assist_Me_ping_SFX.ogg', 'Hold_ping_SFX.ogg', 'Enemy_Missing_ping_SFX.ogg', 'Push_ping_SFX.ogg', 'Caution_ping_SFX.ogg',
 ];
 for (const asset of assetFiles) await access(path.join(root, 'public/assets', asset));
+const uiAssets = uiAssetsFor(new URL('../public/', import.meta.url));
+for (const image of [...uiAssets.sectors.flatMap(sector => [sector.idle, sector.selected]), ...Object.values(uiAssets.rings), uiAssets.esc]) {
+  await access(fileURLToPath(image.url));
+}
 for (const field of ['icon', 'background_url']) {
   const resource = manifest[field];
   if (typeof resource !== 'string' || !resource.startsWith('/')) throw new Error(`Invalid local manifest resource: ${field}`);

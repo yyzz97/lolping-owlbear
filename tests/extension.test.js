@@ -2,18 +2,20 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { registerExtension, CHANNEL, DISPLAY_MS, EXTENSION_ID } from '../src/extension.js';
 import { WHEEL } from '../src/geometry.js';
+import { uiAssetsFor } from '../src/ui-assets.js';
 
 const TEST_WHEEL_ICON = 'https://static.example.test/wheel.svg';
+const TEST_UI_ASSETS = uiAssetsFor('https://static.example.test/');
 const TEST_SIGNAL_ASSETS = Object.fromEntries([
   ['retreat', { width: 256, height: 256, imageUrl: 'https://static.example.test/Retreat_ping.png' }],
-  ['bait', { width: 128, height: 128, imageUrl: 'https://static.example.test/Bait_ping.png' }],
+  ['bait', { width: 128, height: 128, displayScale: 1.15, imageUrl: 'https://static.example.test/Bait_ping.png' }],
   ['omw', { width: 256, height: 256, imageUrl: 'https://static.example.test/On_My_Way_ping.png' }],
   ['allin', { width: 256, height: 256, imageUrl: 'https://static.example.test/All_In_ping.png' }],
   ['assist', { width: 256, height: 256, imageUrl: 'https://static.example.test/Assist_Me_ping.png' }],
   ['hold', { width: 256, height: 256, imageUrl: 'https://static.example.test/Hold_ping.png' }],
   ['missing', { width: 256, height: 256, imageUrl: 'https://static.example.test/Enemy_Missing_ping.png' }],
   ['push', { width: 256, height: 256, imageUrl: 'https://static.example.test/Push_ping.png' }],
-  ['caution', { width: 256, height: 256, imageUrl: 'https://static.example.test/Caution_ping.png' }],
+  ['caution', { width: 256, height: 256, imageUrl: 'https://static.example.test/Caution_ping.png', audioUrl: 'https://static.example.test/Caution_ping_SFX.ogg' }],
 ]);
 
 function builder(type) {
@@ -152,7 +154,7 @@ async function setup(t, scale, withAssets = false) {
   const fake = makeOwlbear(scale);
   const cleanup = registerExtension(fake.obr, {
     buildPath: builder('PATH'), buildLabel: builder('LABEL'), wheelIcon: TEST_WHEEL_ICON,
-    ...(withAssets ? { buildBillboard: billboardBuilder(), signalAssets: TEST_SIGNAL_ASSETS } : {}),
+    ...(withAssets ? { buildBillboard: billboardBuilder(), signalAssets: TEST_SIGNAL_ASSETS, uiAssets: TEST_UI_ASSETS } : {}),
   });
   t.after(cleanup);
   await fake.onReady();
@@ -205,7 +207,7 @@ test('dragging from the scene point selects and broadcasts a scene-anchored sign
   assert.equal([...fake.items.values()].filter(item => item.id.includes('/wheel-glyph/')).length, 8);
   mode.onToolMove({}, event(300, 240));
   await flush();
-  const highlighted = [...fake.items.values()].filter(item => item.id.includes('/wheel/') && item.style.fillOpacity === 0.2);
+  const highlighted = [...fake.items.values()].filter(item => item.id.includes('/wheel/') && item.style.fillOpacity === 0.42);
   assert.equal(highlighted.length, 1);
   const centerLabel = [...fake.items.values()].find(item => item.id.includes('/center-label/'));
   assert.equal(centerLabel.text.plainText, 'ON MY WAY');
@@ -234,22 +236,85 @@ test('dragging from the scene point selects and broadcasts a scene-anchored sign
   assert.equal([...fake.items.values()].filter(item => item.id.includes('/ping-glyph/')).length, 1);
 });
 
-test('center release and Escape cancel without broadcasting', async t => {
-  const fake = await setup(t);
+test('center release sends the default caution signal and Escape cancels', async t => {
+  const played = [];
+  const previousAudio = globalThis.Audio;
+  globalThis.Audio = class {
+    constructor(url) { this.url = url; }
+    play() { played.push(this.url); return Promise.resolve(); }
+  };
+  t.after(() => {
+    if (previousAudio === undefined) delete globalThis.Audio;
+    else globalThis.Audio = previousAudio;
+  });
+  const fake = await setup(t, 2, true);
   const mode = fake.modes.values().next().value;
   mode.onToolDown({}, event(10, 10));
   await flush();
   mode.onToolUp({}, event(10, 10));
   await flush();
-  assert.equal(fake.messages.length, 0);
-  assert.equal(fake.items.size, 0);
+  assert.equal(fake.messages.length, 1);
+  assert.equal(fake.messages[0].data.signalId, 'caution');
+  assert.equal(fake.messages[0].options.destination, 'REMOTE');
+  assert.equal(fake.items.size, 3);
+  assert.deepEqual(played, [TEST_SIGNAL_ASSETS.caution.audioUrl]);
+  assert.equal([...fake.items.values()].find(item => item.id.includes('/ping-glyph/')).image.url, TEST_SIGNAL_ASSETS.caution.imageUrl);
 
   mode.onToolDown({}, event(20, 20));
   await flush();
   mode.onKeyDown({}, { key: 'Escape' });
   await flush();
-  assert.equal(fake.messages.length, 0);
-  assert.equal(fake.items.size, 0);
+  assert.equal(fake.messages.length, 1);
+  assert.equal(fake.items.size, 3);
+  assert.equal(played.length, 1);
+});
+
+test('returning from an outer sector restores caution and remote players receive it at the original scene point', async t => {
+  const sender = await setup(t, 0.15, true);
+  const receiver = await setup(t, 2, true);
+  const mode = sender.modes.values().next().value;
+  mode.onToolDown({}, event(400, 300));
+  await flush();
+  mode.onToolMove({}, event(1400, 300));
+  await flush();
+  mode.onToolUp({}, event(400, 300));
+  await flush();
+  assert.equal(sender.messages.length, 1);
+  const message = sender.messages[0].data;
+  assert.equal(message.signalId, 'caution');
+  assert.deepEqual({ x: message.x, y: message.y }, { x: 400, y: 300 });
+  receiver.messageHandler({ data: message, connectionId: 'bob-connection' });
+  await flush();
+  assert.equal(receiver.items.size, 3);
+  const icon = [...receiver.items.values()].find(item => item.id.includes('/ping-glyph/'));
+  const ring = [...receiver.items.values()].find(item => item.id.includes('/ring/'));
+  assert.equal(icon.image.url, TEST_SIGNAL_ASSETS.caution.imageUrl);
+  assert.deepEqual(ring.position, { x: 400, y: 300 });
+});
+
+test('gradient sectors restore their idle image and the center preview stays above the wheel', async t => {
+  const fake = await setup(t, 1, true);
+  const mode = fake.modes.values().next().value;
+  mode.onToolDown({}, event(200, 200));
+  await flush();
+  const wedges = [...fake.items.values()].filter(item => item.id.includes('/wheel/'));
+  assert.equal(wedges.length, 8);
+  assert.ok(wedges.every((item, index) => item.image.url === TEST_UI_ASSETS.sectors[index].idle.url));
+  mode.onToolMove({}, event(350, 200));
+  await flush();
+  assert.equal(wedges[2].image.url, TEST_UI_ASSETS.sectors[2].selected.url);
+  mode.onToolMove({}, event(200, 200));
+  await flush();
+  assert.equal(wedges[2].image.url, TEST_UI_ASSETS.sectors[2].idle.url);
+  const center = [...fake.items.values()].find(item => item.id.includes('/center-glyph/'));
+  const core = [...fake.items.values()].find(item => item.id.includes('/core/'));
+  assert.ok(center.zIndex > core.zIndex);
+  assert.ok(wedges.every(item => center.zIndex > item.zIndex));
+  assert.equal(center.disableAutoZIndex, true);
+  mode.onToolUp({}, event(200, 200));
+  await flush();
+  const label = [...fake.items.values()].find(item => item.id.includes('/ping/'));
+  assert.equal(label.style.backgroundOpacity, 0);
 });
 
 test('remote messages render only in the matching scene and overlapping pings coexist', async t => {
@@ -265,10 +330,11 @@ test('remote messages render only in the matching scene and overlapping pings co
 
   fake.messageHandler({ data: message, connectionId: 'bob-connection' });
   fake.messageHandler({ data: { ...message, eventId: 'remote-2', signalId: 'bait' }, connectionId: 'bob-connection' });
+  fake.messageHandler({ data: { ...message, eventId: 'remote-3', signalId: 'caution' }, connectionId: 'bob-connection' });
   await flush();
-  assert.equal(fake.items.size, 6);
+  assert.equal(fake.items.size, 9);
   const labels = [...fake.items.values()].filter(item => item.type === 'LABEL');
-  assert.equal(labels.length, 2);
+  assert.equal(labels.length, 3);
   assert.ok(labels.every(item => item.text.plainText.includes('Bob')));
 });
 
@@ -344,8 +410,8 @@ test('wheel geometry and icons compensate zoom while labels retain their native 
     const pingIcon = [...fake.items.values()].find(item => item.id.includes('/ping-glyph/'));
     assert.deepEqual(pingLabel.scale, { x: 1, y: 1 });
     assert.equal(pingLabel.text.style.fontSize, 13);
-    assert.equal(ring.scale.x * scale, 1);
-    assert.equal(ring.scale.y * scale, 1);
+    assert.equal(ring.scale.x * ring.image.width / ring.grid.dpi * 96, 128);
+    assert.equal(ring.scale.y * ring.image.height / ring.grid.dpi * 96, 88);
     assert.equal(pingIcon.scale.x * pingIcon.image.width / pingIcon.grid.dpi * 96, 48);
     assert.equal((pingLabel.position.y - 52 / scale) * scale, 0);
 
@@ -354,13 +420,21 @@ test('wheel geometry and icons compensate zoom while labels retain their native 
     await flush();
     const wheelIcons = [...fake.items.values()].filter(item => item.id.includes('/wheel-glyph/'));
     assert.equal(wheelIcons.length, 8);
-    for (const item of wheelIcons) assert.equal(item.scale.x * item.image.width / item.grid.dpi * 96, WHEEL.iconSize);
+    for (const item of wheelIcons) {
+      const signalAsset = Object.values(TEST_SIGNAL_ASSETS).find(asset => asset.imageUrl === item.image.url);
+      assert.ok(Math.abs(item.scale.x * 96 - WHEEL.iconSize * (signalAsset.displayScale ?? 1)) < 0.0001);
+    }
     const center = [...fake.items.values()].find(item => item.id.includes('/center-label/'));
     const back = [...fake.items.values()].find(item => item.id.includes('/back/'));
     assert.deepEqual(center.scale, { x: 1, y: 1 });
     assert.deepEqual(back.scale, { x: 1, y: 1 });
     assert.equal(center.text.style.fontSize, 19);
     assert.equal(back.text.style.fontSize, 14);
+    const esc = [...fake.items.values()].find(item => item.id.includes('/esc-key/'));
+    assert.equal(esc.image.url, TEST_UI_ASSETS.esc.url);
+    assert.equal(esc.scale.x * esc.image.width / esc.grid.dpi * 96, 32);
+    assert.equal(esc.scale.y * esc.image.height / esc.grid.dpi * 96, 16);
+    assert.ok(Math.abs(esc.position.x * scale + 27) < 0.0001);
     assert.equal(WHEEL.innerRadius, 102);
     assert.equal(WHEEL.outerRadius, 170);
   }
@@ -400,12 +474,26 @@ test('uses supplied PNG assets for the wheel, selected center, and map marker', 
   assert.ok(wheelImages.every(item => item.image.url.endsWith('.png')));
   assert.ok(wheelImages.every(item => item.grid.dpi === item.image.width));
   assert.ok(wheelImages.every(item => item.grid.offset.x === item.image.width / 2 && item.grid.offset.y === item.image.height / 2));
-  assert.ok(wheelImages.slice(0, 8).every(item => item.scale.x * item.image.width / item.grid.dpi * 96 === WHEEL.iconSize));
+  assert.ok(wheelImages.slice(0, 8).every(item => {
+    const asset = Object.values(signalAssets).find(asset => asset.imageUrl === item.image.url);
+    return Math.abs(item.scale.x * 96 - WHEEL.iconSize * (asset.displayScale ?? 1)) < 0.0001;
+  }));
   mode.onToolMove({}, event(100, 400));
   await flush();
   const center = [...fake.items.values()].find(item => item.id.includes('/center-glyph/'));
   assert.equal(center.image.url, signalAssets.assist.imageUrl);
   assert.equal(center.scale.x * center.image.width / center.grid.dpi * 96, 36);
+  mode.onToolMove({}, event(200, 0));
+  await flush();
+  assert.equal(center.image.url, signalAssets.bait.imageUrl);
+  assert.equal(center.grid.dpi, 128);
+  assert.deepEqual(center.grid.offset, { x: 64, y: 64 });
+  assert.equal(center.scale.x * center.image.width / center.grid.dpi * 96, 36 * signalAssets.bait.displayScale);
+  mode.onToolMove({}, event(100, 0));
+  await flush();
+  assert.equal(center.image.url, signalAssets.retreat.imageUrl);
+  assert.equal(center.grid.dpi, 256);
+  assert.deepEqual(center.grid.offset, { x: 128, y: 128 });
   mode.onToolUp({}, event(100, 400));
   await flush();
   const marker = [...fake.items.values()].find(item => item.id.includes('/ping-glyph/'));

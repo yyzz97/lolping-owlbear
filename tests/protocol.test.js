@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { parsePing } from '../src/protocol.js';
-import { SIGNALS } from '../src/signals.js';
+import { DEFAULT_SIGNAL, SIGNALS } from '../src/signals.js';
 
 const valid = {
   v: 1,
@@ -19,9 +19,10 @@ test('a valid message preserves world coordinates and strips sender-provided dis
   assert.deepEqual(parsePing(raw), valid);
 });
 
-test('only the eight supported signal IDs can be sent', () => {
+test('the eight wheel signals and center caution can be sent', () => {
   assert.equal(SIGNALS.length, 8);
   for (const signal of SIGNALS) assert.equal(parsePing({ ...valid, signalId: signal.id })?.signalId, signal.id);
+  assert.equal(parsePing({ ...valid, signalId: DEFAULT_SIGNAL.id })?.signalId, DEFAULT_SIGNAL.id);
   assert.equal(parsePing({ ...valid, signalId: 'danger' })?.signalId, 'danger');
   assert.equal(parsePing({ ...valid, signalId: 'custom' }), null);
   assert.equal(parsePing({ ...valid, signalId: '__proto__' }), null);

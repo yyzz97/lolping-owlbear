@@ -13,5 +13,5 @@ export const DEFAULT_SIGNAL = { id: 'caution', name: '注意', label: 'CAUTION',
 
 const LEGACY_SIGNAL_IDS = Object.freeze({ danger: 'retreat', needvision: 'hold', enemyvision: 'bait' });
 
-export const signalById = id => SIGNALS.find(signal => signal.id === id)
+export const signalById = id => id === DEFAULT_SIGNAL.id ? DEFAULT_SIGNAL : SIGNALS.find(signal => signal.id === id)
   ?? SIGNALS.find(signal => signal.id === LEGACY_SIGNAL_IDS[id]);
