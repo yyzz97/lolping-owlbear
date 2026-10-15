@@ -323,8 +323,8 @@ test('all wheel states share a single image size, including bait and the full mi
     assert.equal(selection.image.url, TEST_UI_ASSETS.wheelSelections[id].url);
     assert.equal(center.image.url, TEST_UI_ASSETS.wheelCenters[id].url);
     assert.equal(fake.items.size, 3, 'static wheel and two overlays remain mounted');
-      assert.equal(wheel.image.width, 800);
-    assert.deepEqual(wheel.grid.offset, { x: 400, y: 400 });
+      assert.equal(wheel.image.width, 1000);
+    assert.deepEqual(wheel.grid.offset, { x: 500, y: 500 });
   }
   mode.onToolMove({}, event(70, 200));
   await flush();
@@ -438,8 +438,8 @@ test('fixed billboards and native labels share scene anchors across zoom and gri
     for (const zoom of [0.01, 0.025, 0.05, 0.15, 0.5, 1, 2, 8, 32, 64]) {
       await fake.obr.viewport.setScale(zoom);
       const wheelSize = projectedSize(wheel, dpi, zoom);
-      assert.ok(Math.abs(wheelSize.width - 394) < 0.0001);
-      assert.ok(Math.abs(wheelSize.height - 394) < 0.0001);
+      assert.ok(Math.abs(wheelSize.width - 472) < 0.0001);
+      assert.ok(Math.abs(wheelSize.height - 472) < 0.0001);
       assert.deepEqual(projectedSize(ping, dpi, zoom), { width: 200, height: 128 });
       assert.deepEqual(ping.position, { x: 900, y: 500 });
       assert.deepEqual(ping.grid.offset, { x: 200, y: 100 });

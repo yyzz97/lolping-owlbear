@@ -4,11 +4,11 @@ export function uiAssetsFor(base) {
   });
   const ids = ['retreat', 'push', 'omw', 'allin', 'assist', 'needvision', 'missing', 'enemyvision', 'caution'];
   return {
-    wheels: Object.fromEntries(ids.map(id => [id, image(`wheel-${id}`, 800)])),
-    wheelBase: image('wheel-base', 800),
-    wheelSelectionNone: image('wheel-selection-none', 800),
-    wheelSelections: Object.fromEntries(ids.map(id => [id, image(`wheel-selection-${id}`, 800)])),
-    wheelCenters: Object.fromEntries(ids.map(id => [id, image(`wheel-center-${id}`, 800)])),
+    wheels: Object.fromEntries(ids.map(id => [id, image(`wheel-${id}`, 1000)])),
+    wheelBase: image('wheel-base', 1000),
+    wheelSelectionNone: image('wheel-selection-none', 1000),
+    wheelSelections: Object.fromEntries(ids.map(id => [id, image(`wheel-selection-${id}`, 1000)])),
+    wheelCenters: Object.fromEntries(ids.map(id => [id, image(`wheel-center-${id}`, 1000)])),
     pings: Object.fromEntries(ids.map(id => [id, image(`ping-${id}`, 400, 256)])),
   };
 }

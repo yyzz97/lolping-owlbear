@@ -1,6 +1,6 @@
 {
-  "name": "lolPing · Signal Wheel for Owlbear Rodeo",
-  "version": "1.0.23",
+  "name": "LOL Ping Wheel",
+  "version": "1.0.25",
   "manifest_version": 1,
   "description": "Eight-direction League-style map signals and center Caution for Owlbear Rodeo.",
   "author": "yyzz97",

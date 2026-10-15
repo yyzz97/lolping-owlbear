@@ -7,13 +7,14 @@ from PIL import Image, ImageDraw, ImageFont
 OUTPUT = Path(__file__).resolve().parents[1] / "public" / "ui"
 OUTPUT.mkdir(exist_ok=True)
 SCALE = 2
-CANVAS = 800
+CANVAS = 1000
 CENTER = CANVAS // 2
 INNER = 85
 # The diagonal wedges reach the old cardinal edge.  Cardinal wedges then
 # continue a little farther and fade out quickly over that extra span.
-CARDINAL_OUTER = 195
+CARDINAL_OUTER = 234
 DIAGONAL_OUTER = 180
+CARDINAL_FADE_START = 168
 
 def sector_radius(index):
     return CARDINAL_OUTER if index % 2 == 0 else DIAGONAL_OUTER
@@ -37,10 +38,10 @@ def sector_image(index, selected):
                 elif index % 2 == 0:
                     # Keep the cardinal dark area through the diagonal edge,
                     # then fade quickly through the extra cardinal extension.
-                    if radius <= DIAGONAL_OUTER:
+                    if radius <= CARDINAL_FADE_START:
                         radial = 1
                     else:
-                        fade = (radius - DIAGONAL_OUTER) / max(1, CARDINAL_OUTER - DIAGONAL_OUTER)
+                        fade = (radius - CARDINAL_FADE_START) / max(1, CARDINAL_OUTER - CARDINAL_FADE_START)
                         radial = max(0, 1 - fade * fade * (3 - 2 * fade))
                 else:
                     radial = 1
