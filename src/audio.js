@@ -1,5 +1,16 @@
 let context;
 
+const PING_NOTES = Object.freeze({
+  danger: [784, 1047],
+  push: [587, 880],
+  omw: [698, 988],
+  allin: [523, 784],
+  assist: [659, 988],
+  needvision: [988, 1319],
+  missing: [880, 659],
+  enemyvision: [1047, 784],
+});
+
 export async function unlockAudio() {
   const AudioContextClass = typeof window === 'undefined' ? null : window.AudioContext ?? window.webkitAudioContext;
   if (!AudioContextClass) return;
@@ -11,19 +22,24 @@ export async function unlockAudio() {
   }
 }
 
-export function playPing() {
+export function playPing(signalId = 'omw') {
   if (!context || context.state !== 'running') return;
   const now = context.currentTime;
-  for (const [offset, frequency] of [[0, 880], [0.07, 1174.66]]) {
+  const notes = PING_NOTES[signalId] ?? PING_NOTES.omw;
+  notes.forEach((frequency, index) => {
+    const offset = index * 0.045;
+    const start = now + offset;
+    const duration = index === 0 ? 0.115 : 0.15;
     const oscillator = context.createOscillator();
     const gain = context.createGain();
-    oscillator.type = 'sine';
-    oscillator.frequency.setValueAtTime(frequency, now + offset);
-    gain.gain.setValueAtTime(0.0001, now + offset);
-    gain.gain.exponentialRampToValueAtTime(0.12, now + offset + 0.012);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + offset + 0.18);
+    oscillator.type = index === 0 ? 'triangle' : 'sine';
+    oscillator.frequency.setValueAtTime(frequency * 1.04, start);
+    oscillator.frequency.exponentialRampToValueAtTime(frequency, start + 0.025);
+    gain.gain.setValueAtTime(0.0001, start);
+    gain.gain.exponentialRampToValueAtTime(index === 0 ? 0.085 : 0.052, start + 0.009);
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
     oscillator.connect(gain).connect(context.destination);
-    oscillator.start(now + offset);
-    oscillator.stop(now + offset + 0.2);
-  }
+    oscillator.start(start);
+    oscillator.stop(start + duration + 0.01);
+  });
 }

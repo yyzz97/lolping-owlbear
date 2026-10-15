@@ -1,4 +1,4 @@
-export const WHEEL = Object.freeze({ innerRadius: 82, outerRadius: 224, iconRadius: 151 });
+export const WHEEL = Object.freeze({ innerRadius: 86, outerRadius: 188, haloRadius: 288, iconRadius: 137, iconSize: 48 });
 
 export function pickSlice(dx, dy, deadZone = WHEEL.innerRadius) {
   if (!Number.isFinite(dx) || !Number.isFinite(dy) || Math.hypot(dx, dy) < deadZone) return -1;
@@ -38,5 +38,17 @@ export function circleCommands(radius, segments = 48) {
     commands.push([1, radius * Math.cos(angle), radius * Math.sin(angle)]);
   }
   commands.push([5]);
+  return commands;
+}
+
+export function spokeCommands(innerRadius = WHEEL.innerRadius, outerRadius = WHEEL.outerRadius) {
+  const commands = [];
+  for (let index = 0; index < 8; index++) {
+    const angle = (-112.5 + index * 45) * Math.PI / 180;
+    commands.push(
+      [0, innerRadius * Math.cos(angle), innerRadius * Math.sin(angle)],
+      [1, outerRadius * Math.cos(angle), outerRadius * Math.sin(angle)],
+    );
+  }
   return commands;
 }

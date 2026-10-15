@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { registerExtension, CHANNEL, DISPLAY_MS, EXTENSION_ID } from '../src/extension.js';
+import { WHEEL } from '../src/geometry.js';
 
 const TEST_WHEEL_ICON = 'https://static.example.test/wheel.svg';
 
@@ -167,11 +168,13 @@ test('dragging from the scene point selects and broadcasts a scene-anchored sign
   const mode = fake.modes.values().next().value;
   mode.onToolDown({}, event(120, 240));
   await flush();
-  assert.equal(fake.items.size, 18, 'the local eight-way wheel is displayed');
+  assert.equal([...fake.items.values()].filter(item => item.id.includes('/wheel/')).length, 8);
+  assert.equal([...fake.items.values()].filter(item => item.id.includes('/wheel-glyph/')).length, 8);
   mode.onToolMove({}, event(300, 240));
   await flush();
-  const highlighted = [...fake.items.values()].filter(item => item.type === 'PATH' && item.style.fillOpacity === 0.68);
+  const highlighted = [...fake.items.values()].filter(item => item.id.includes('/wheel/') && item.style.fillOpacity === 0.55);
   assert.equal(highlighted.length, 1);
+  assert.equal(highlighted[0].style.fillColor, '#8a8f96');
   mode.onToolUp({}, event(300, 240));
   await flush();
   assert.equal(fake.messages.length, 1);
@@ -184,7 +187,8 @@ test('dragging from the scene point selects and broadcasts a scene-anchored sign
   const marker = [...fake.items.values()].find(item => item.type === 'LABEL');
   assert.match(marker.text.plainText, /正在路上/);
   assert.match(marker.text.plainText, /Alice/);
-  assert.equal(fake.items.size, 2, 'wheel is removed and the temporary local ping remains');
+  assert.equal(fake.items.size, 4, 'wheel is removed and the temporary local ping remains');
+  assert.equal([...fake.items.values()].filter(item => item.id.includes('/ping-glyph/')).length, 1);
 });
 
 test('center release and Escape cancel without broadcasting', async t => {
@@ -219,7 +223,7 @@ test('remote messages render only in the matching scene and overlapping pings co
   fake.messageHandler({ data: message, connectionId: 'bob-connection' });
   fake.messageHandler({ data: { ...message, eventId: 'remote-2', signalId: 'push' }, connectionId: 'bob-connection' });
   await flush();
-  assert.equal(fake.items.size, 4);
+  assert.equal(fake.items.size, 8);
   const labels = [...fake.items.values()].filter(item => item.type === 'LABEL');
   assert.equal(labels.length, 2);
   assert.ok(labels.every(item => item.text.plainText.includes('Bob')));
@@ -251,7 +255,7 @@ test('temporary pings are scheduled for the selected duration', async t => {
   });
   await flush();
   assert.equal(DISPLAY_MS, 3000);
-  assert.equal(fake.items.size, 2);
+  assert.equal(fake.items.size, 4);
 });
 
 test('players still share scene identity when scene metadata is read-only', async t => {
@@ -282,7 +286,7 @@ test('players still share scene identity when scene metadata is read-only', asyn
   assert.match(marker.text.plainText, /正在路上/);
 });
 
-test('wheel and ping labels keep a fixed screen size at different zoom levels', async t => {
+test('wheel geometry, icon offsets, and pings keep a fixed screen size at different zoom levels', async t => {
   for (const scale of [0.5, 2]) {
     const fake = await setup(t, scale);
     const key = fake.metadata[EXTENSION_ID].sceneKey;
@@ -294,20 +298,40 @@ test('wheel and ping labels keep a fixed screen size at different zoom levels', 
 
     const pingLabel = [...fake.items.values()].find(item => item.id.includes('/ping/'));
     const ring = [...fake.items.values()].find(item => item.id.includes('/ring/'));
-    assert.equal(pingLabel.scale.x, 1 / scale);
-    assert.equal(pingLabel.scale.y, 1 / scale);
-    assert.equal(ring.scale.x, 1 / scale);
-    assert.equal(ring.scale.y, 1 / scale);
+    const pingIcon = [...fake.items.values()].find(item => item.id.includes('/ping-glyph/'));
+    assert.equal(pingLabel.scale.x * scale, 1);
+    assert.equal(pingLabel.scale.y * scale, 1);
+    assert.equal(ring.scale.x * scale, 1);
+    assert.equal(ring.scale.y * scale, 1);
+    assert.equal(pingIcon.scale.x * scale * WHEEL.iconSize, 34);
+    assert.equal((pingLabel.position.y - 45 / scale) * scale, 0);
 
     const mode = fake.modes.values().next().value;
     mode.onToolDown({}, event(0, 0));
     await flush();
-    const wheelLabels = [...fake.items.values()].filter(item => item.type === 'LABEL'
-      && (item.id.includes('/icon/') || item.id.includes('/center/')));
-    assert.equal(wheelLabels.length, 9);
-    for (const item of wheelLabels) {
-      assert.equal(item.scale.x, 1 / scale);
-      assert.equal(item.scale.y, 1 / scale);
-    }
+    const wheelIcons = [...fake.items.values()].filter(item => item.id.includes('/wheel-glyph/'));
+    assert.equal(wheelIcons.length, 8);
+    for (const item of wheelIcons) assert.equal(item.scale.x * scale * WHEEL.iconSize, WHEEL.iconSize);
+    const center = [...fake.items.values()].find(item => item.id.includes('/center/'));
+    assert.equal(center.scale.x * scale, 1);
+    const halo = [...fake.items.values()].find(item => item.id.includes('/halo/') && item.commands?.length > 30);
+    assert.equal(halo.scale.x * scale * WHEEL.haloRadius, WHEEL.haloRadius);
+  }
+});
+
+test('the same screen-space drag selects the same direction at zoomed and reduced scales', async t => {
+  for (const scale of [0.5, 2]) {
+    const fake = await setup(t, scale);
+    const mode = fake.modes.values().next().value;
+    mode.onToolDown({}, event(400, 300));
+    await flush();
+    const screenDrag = 120;
+    const release = event(400 + screenDrag / scale, 300);
+    mode.onToolMove({}, release);
+    await flush();
+    mode.onToolUp({}, release);
+    await flush();
+    assert.equal(fake.messages.length, 1);
+    assert.equal(fake.messages[0].data.signalId, 'omw');
   }
 });
