@@ -25,6 +25,8 @@ npm run build
 
 Use the Vite URL for local extension development. `npm run build` writes the Owlbear manifest, background page, and assets to `dist/`; the build step converts manifest resource paths to the hosted GitHub Pages URLs.
 
+The toolbar uses `public/wheel-tool.png`, a white silhouette with a transparent background and diamond cutout, so Owlbear can tint the icon. Regenerate it from the supplied Generic ping image with `python scripts/generate-tool-icon.py <Generic_ping.png>` (Pillow required).
+
 The wheel's center radius is 85 CSS pixels; diagonal artwork reaches 180 pixels and cardinal artwork reaches 195 pixels. Outer icons are 42 pixels, and center previews are 32 pixels. The transparent UI artwork is committed in `public/ui/`. Regenerate it with `python scripts/generate-ui-assets.py` on Windows with Pillow installed; Python and Pillow are not required to build or run the extension. With the Vite server running, `/tests/render-fixture.html` previews all wheel states and the browser's actual PNG/text composition.
 
 ## Two-client acceptance

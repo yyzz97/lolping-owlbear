@@ -13,6 +13,7 @@ for (const entry of await readdir(sourceDir, { withFileTypes: true })) {
 }
 
 const manifest = JSON.parse(await readFile(path.join(root, 'public/manifest.json'), 'utf8'));
+await access(path.join(root, 'public/wheel-tool.png'));
 const assetFiles = [
   'Retreat_ping.png', 'Push_ping.png', 'On_My_Way_ping.png', 'All_In_ping.png',
   'Assist_Me_ping.png', 'Need_Vision_ping.png', 'Enemy_Missing_ping.png', 'Enemy_Vision_ping.png', 'Caution_ping.png',

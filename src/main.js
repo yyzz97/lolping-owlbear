@@ -3,7 +3,7 @@ import { registerExtension } from './extension.js';
 import { uiAssetsFor, preloadImages } from './ui-assets.js';
 import packageJson from '../package.json';
 
-const wheelIcon = new URL('./wheel.svg', document.baseURI).href;
+const wheelIcon = new URL('./wheel-tool.png', document.baseURI).href;
 const asset = file => ({
   audioUrl: new URL(`./assets/${file}_SFX.ogg`, document.baseURI).href,
 });
